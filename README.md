@@ -1,16 +1,18 @@
-# Newsletter Transcript Analyzer
+# Qwilo - Article Idea Generator
 
-An interactive CLI tool that fetches Gemini conversation transcripts from Gmail and analyzes them to generate newsletter content suggestions focused on AI strategy and innovation for business leaders.
+An interactive CLI tool that fetches Gemini conversation transcripts from Gmail and analyzes them to generate article content suggestions focused on AI strategy and innovation for business leaders.
 
 ## Features
 
 - Fetches transcripts from Gmail with subject pattern: `Notes: "[Subject]" [MMM DD, YYYY]`
-- Interactive CLI for selecting and analyzing transcripts
+- Extracts full transcripts from Google Docs (prefers Transcript tab over Summary)
+- Interactive CLI with ASCII art logo and rich terminal UI
+- Label-based filtering to focus on specific conversations
 - AI-powered content analysis using Claude API
 - Generates:
-  - Recommended newsletter topics
-  - Key insights in bullet points
-  - Notable quotes with context
+  - Recommended article topics (2-4 topics)
+  - Key insights specific to each topic
+  - Notable verbatim quotes with speaker attribution
 - Save analysis results to markdown files
 - Batch processing support
 
@@ -19,15 +21,15 @@ An interactive CLI tool that fetches Gemini conversation transcripts from Gmail 
 - Python 3.8 or higher
 - Gmail account
 - Anthropic API key
-- Google Cloud project with Gmail API enabled
+- Google Cloud project with Gmail API, Google Docs API, and Google Drive API enabled
 
-## Setup Instructions
+## Installation
 
-### 1. Clone or Download
+### 1. Clone the Repository
 
-Navigate to the project directory:
 ```bash
-cd newsletter-transcript-analyzer
+git clone https://github.com/stephenhsklarew/article-idea-generator.git
+cd article-idea-generator
 ```
 
 ### 2. Install Dependencies
@@ -43,7 +45,11 @@ Install required packages:
 pip install -r requirements.txt
 ```
 
+## Configuration
+
 ### 3. Set Up Google Cloud APIs
+
+#### Enable Required APIs
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select an existing one
@@ -52,70 +58,114 @@ pip install -r requirements.txt
    - Search for and enable **"Gmail API"**
    - Search for and enable **"Google Docs API"**
    - Search for and enable **"Google Drive API"**
-4. Create OAuth 2.0 credentials:
-   - Go to "APIs & Services" > "Credentials"
-   - Click "Create Credentials" > "OAuth client ID"
-   - Choose "Desktop app" as application type
-   - Download the credentials JSON file
-   - Save it as `credentials.json` in the project directory
 
-### 4. Set Up Anthropic API
+#### Create OAuth 2.0 Credentials
 
-1. Get your Anthropic API key from [console.anthropic.com](https://console.anthropic.com/)
-2. Copy `.env.example` to `.env`:
+1. Go to "APIs & Services" > "Credentials"
+2. Click "Create Credentials" > "OAuth client ID"
+3. If prompted, configure the OAuth consent screen:
+   - Choose "Internal" (if using Google Workspace) or "External"
+   - Fill in app name: "Article Idea Generator"
+   - Add your email as a developer contact
+   - Add scopes: `gmail.readonly`, `drive.readonly`, `documents.readonly`
+4. Choose "Desktop app" as application type
+5. Download the credentials JSON file
+6. **Save it as `credentials.json` in the project root directory**
+
+**Important:** The `credentials.json` file is required for the application to authenticate with Google APIs. This file is automatically excluded from git via `.gitignore` to keep your credentials secure.
+
+### 4. Set Up Environment Variables
+
+1. Copy the example environment file:
    ```bash
    cp .env.example .env
    ```
-3. Edit `.env` and configure:
-   ```
+
+2. Edit `.env` and add your Anthropic API key:
+   ```bash
+   # Required: Your Anthropic API key
    ANTHROPIC_API_KEY=your_actual_api_key_here
 
    # Optional: Set a start date to only analyze transcripts from this date forward
    # Format: MMDDYYYY (e.g., 10232025 for October 23, 2025)
    # Leave blank to analyze all transcripts
    START_DATE=
+
+   # Optional: Filter settings
+   # Comma-separated list of people to exclude from analysis
+   EXCLUDE_PEOPLE=
+
+   # Comma-separated list of subject keywords to exclude
+   EXCLUDE_SUBJECTS=
    ```
 
-### 5. Configure Date Filter (Optional)
+3. Get your Anthropic API key from [console.anthropic.com](https://console.anthropic.com/)
 
-You can filter transcripts to only show those from a specific date forward:
+**Important:** The `.env` file contains sensitive API keys and is automatically excluded from git via `.gitignore`.
 
-**Option 1: Set in .env file**
+### 5. First Run Authentication
+
+On your first run, the application will:
+1. Open a browser window to authenticate with Google
+2. Ask you to select your Gmail account
+3. Request permission to read emails and documents
+4. Save the authentication token as `token.pickle` for future use
+
+**Important:** The `token.pickle` file is automatically generated after your first authentication and is excluded from git via `.gitignore`. If you encounter authentication issues, delete this file and re-run the application to re-authenticate.
+
+## File Structure Overview
+
+After setup, your project should have these sensitive files (all excluded from git):
+
 ```
-START_DATE=10232025
+article-idea-generator/
+├── credentials.json       # Google OAuth credentials (you download)
+├── token.pickle          # Google OAuth token (auto-generated on first run)
+├── .env                  # Your API keys and config (you create from .env.example)
+└── .env.save             # Backup of .env (optional)
 ```
-
-**Option 2: Set at runtime**
-When you run the program, if no START_DATE is configured, you'll be prompted whether you want to set one.
-
-The date format is `MMDDYYYY`:
-- `10232025` = October 23, 2025
-- `01152025` = January 15, 2025
-
-This is useful for:
-- Focusing on recent conversations only
-- Excluding old transcripts you've already processed
-- Analyzing transcripts from a specific time period
-
-### 6. First Run Authentication
-
-On your first run, the application will open a browser window to authenticate with Google:
-1. Select your Gmail account
-2. Grant permission to read emails
-3. The authentication token will be saved as `token.pickle` for future use
 
 ## Usage
 
-### Running the Application
+### Basic Usage
 
+Run the interactive CLI:
 ```bash
-python cli.py
+python3 cli.py
 ```
 
 Or make it executable:
 ```bash
 chmod +x cli.py
 ./cli.py
+```
+
+### Command-Line Options
+
+List all available transcripts:
+```bash
+python3 cli.py --list
+```
+
+Analyze a specific email by subject (supports partial matching):
+```bash
+python3 cli.py --email "Meeting Notes"
+```
+
+Filter by Gmail label:
+```bash
+python3 cli.py --label "blog-potential"
+python3 cli.py --list --label "AIQ"
+```
+
+Filter by start date:
+```bash
+python3 cli.py --start-date 10232025
+```
+
+Combine filters:
+```bash
+python3 cli.py --label "blog-potential" --email "Strategy"
 ```
 
 ### Interactive Menu Options
@@ -134,19 +184,54 @@ Once the application starts, you'll see:
    - Choose to save the analysis to a file
    - Continue to the next transcript or return to the menu
 
+### Date Filtering
+
+You can filter transcripts by date in three ways:
+
+**Option 1: Set in .env file**
+```
+START_DATE=10232025
+```
+
+**Option 2: Use command-line argument**
+```bash
+python3 cli.py --start-date 10232025
+```
+
+**Option 3: Interactive prompt**
+If no START_DATE is configured and you're not using `--label`, you'll be prompted whether you want to set one.
+
+The date format is `MMDDYYYY`:
+- `10232025` = October 23, 2025
+- `01152025` = January 15, 2025
+
+**Note:** When using `--label` to filter by Gmail labels, the date filter is automatically disabled to show all emails with that label regardless of date.
+
 ### Output Format
 
 Each analysis includes:
 
 ```markdown
-## RECOMMENDED TOPICS
-1-4 specific topics that could be developed into newsletter articles
+**Source:** [Original email subject]
 
-## KEY INSIGHTS
-5-8 bullet points capturing the most important learnings
+## TOPIC 1: [Topic Title]
 
-## NOTABLE QUOTES
-3-5 impactful quotes with context
+**Description:** [1-2 sentences on why this would make a good article]
+
+**Key Insights:**
+• [Insight 1 related to this topic]
+• [Insight 2 related to this topic]
+• [Insight 3 related to this topic]
+
+**Notable Quotes:**
+> **[Speaker Name]:** "[Exact verbatim quote from transcript]"
+
+> **[Speaker Name]:** "[Another exact quote]"
+
+---
+
+## TOPIC 2: [Topic Title]
+...
 ```
 
 ### Saved Files
@@ -156,67 +241,106 @@ Analysis files are automatically named:
 analysis_[topic]_[timestamp].md
 ```
 
-Example: `analysis_AI_Strategy_Implementation_20250123_143022.md`
+Example: `analysis_AI_Strategy_Implementation_20251104_143022.md`
+
+## Transcript Tab Detection
+
+The tool intelligently extracts content from Google Docs:
+
+- ✅ **Prefers "Transcript" tab** - Contains full conversation with timestamps and speakers
+- ⚠️ **Falls back to "Notes" tab** - If no Transcript tab exists (summary content only)
+- 📊 **Reports tab selection** - Shows which tab is being used during processing
+
+For best results with verbatim quotes, use recordings that have a full Transcript tab. The tool will indicate when it's using a summary instead of a full transcript.
 
 ## Project Structure
 
 ```
-newsletter-transcript-analyzer/
-├── cli.py                  # Main interactive CLI application
-├── gmail_client.py         # Gmail API integration
-├── content_analyzer.py     # Claude API integration for analysis
-├── requirements.txt        # Python dependencies
-├── .env.example           # Environment variable template
-├── .gitignore             # Git ignore rules
-├── README.md              # This file
-├── credentials.json       # Google OAuth credentials (you provide)
-├── token.pickle          # Google OAuth token (auto-generated)
-└── .env                  # Your environment variables (you create)
+article-idea-generator/
+├── cli.py                     # Main interactive CLI application
+├── gmail_client.py            # Gmail API integration with label filtering
+├── google_docs_client.py      # Google Docs API for transcript extraction
+├── content_analyzer.py        # Claude API integration for analysis
+├── requirements.txt           # Python dependencies
+├── .env.example              # Environment variable template
+├── .gitignore                # Git ignore rules (protects sensitive files)
+├── README.md                 # This file
+├── qwilo_logo.png            # Application logo
+├── credentials.json          # Google OAuth credentials (you provide, not in git)
+├── token.pickle             # Google OAuth token (auto-generated, not in git)
+└── .env                     # Your environment variables (you create, not in git)
 ```
 
 ## Troubleshooting
 
 ### "credentials.json not found"
-Download OAuth credentials from Google Cloud Console (see step 3 in Setup).
+**Solution:** Download OAuth credentials from Google Cloud Console:
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Navigate to "APIs & Services" > "Credentials"
+3. Download your OAuth 2.0 Client ID credentials
+4. Save the file as `credentials.json` in the project root directory
 
 ### "ANTHROPIC_API_KEY not found"
-Create a `.env` file and add your Anthropic API key (see step 4 in Setup).
+**Solution:** Create a `.env` file:
+1. Copy `.env.example` to `.env`: `cp .env.example .env`
+2. Edit `.env` and add your Anthropic API key
+3. Get your API key from [console.anthropic.com](https://console.anthropic.com/)
 
 ### "No transcripts found"
-Verify that your emails have the exact subject format:
+**Solution:** Verify that your emails have the correct subject format:
 ```
-Notes: "Your Topic Here" [Jan 15, 2025]
+Notes: "Your Topic Here" Jan 15, 2025
 ```
+The tool supports both straight quotes (") and curly quotes ("").
 
 ### Authentication issues
-Delete `token.pickle` and re-run the application to re-authenticate.
+**Solution:** Delete `token.pickle` and re-run the application:
+```bash
+rm token.pickle
+python3 cli.py
+```
+This will trigger a new authentication flow.
 
 ### Import errors
-Ensure you've activated your virtual environment and installed dependencies:
+**Solution:** Ensure you've activated your virtual environment and installed dependencies:
 ```bash
 source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+### Label filtering returns wrong results
+**Solution:**
+- Make sure you're using the exact label name from Gmail (case-insensitive)
+- Spaces, hyphens, and underscores are normalized (e.g., "blog-potential" matches "Blog Potential")
+- The label is filtered at the Gmail API level, not post-processing
+
+### "Cannot provide verbatim quotes" error
+**Solution:** This occurs when the document only has a "Notes" (summary) tab instead of a full "Transcript" tab. Select a different transcript that has the full conversation recorded, or use the analysis for insights rather than quotes.
+
 ## Tips for Best Results
 
-1. **Review transcripts before analyzing** - The quality of analysis depends on the transcript quality
-2. **Save important analyses** - Use the save feature to keep analyses you want to reference
-3. **Batch process related topics** - Use the range feature to analyze related conversations together
-4. **Refine topics** - The AI suggestions are starting points; use your editorial judgment
+1. **Choose transcripts with full Transcript tabs** - These contain speaker names and verbatim dialogue
+2. **Use label filtering** - Tag important conversations in Gmail with labels like "Blog potential"
+3. **Review transcripts before analyzing** - The quality of analysis depends on transcript quality
+4. **Save important analyses** - Use the save feature to keep analyses you want to reference
+5. **Batch process related topics** - Use the range feature to analyze related conversations together
+6. **Refine topics** - The AI suggestions are starting points; use your editorial judgment
 
 ## Security Notes
 
-- Never commit `credentials.json`, `token.pickle`, or `.env` to version control
-- Keep your API keys secure
-- The application only reads emails (readonly scope)
-- Authentication tokens are stored locally
+- ✅ Never commit `credentials.json`, `token.pickle`, or `.env` to version control
+- ✅ All sensitive files are automatically excluded via `.gitignore`
+- ✅ Keep your API keys secure and rotate them periodically
+- ✅ The application only reads emails (readonly scope)
+- ✅ Authentication tokens are stored locally on your machine
 
 ## Support
 
 For issues related to:
 - Gmail API: [Google Gmail API Documentation](https://developers.google.com/gmail/api)
+- Google Docs API: [Google Docs API Documentation](https://developers.google.com/docs/api)
 - Claude API: [Anthropic Documentation](https://docs.anthropic.com/)
+- Application bugs: [GitHub Issues](https://github.com/stephenhsklarew/article-idea-generator/issues)
 
 ## License
 
