@@ -5,6 +5,7 @@ Newsletter Transcript Analyzer - AI Strategy & Innovation Content Generator
 Usage:
   python cli.py                           # Interactive mode (combined output by default)
   python cli.py --separate-files          # Save each analysis to separate files
+  python cli.py --focus "custom topic"    # Override content focus
   python cli.py --email "Notes: Meeting"  # Analyze specific email by subject
   python cli.py --list                    # List all available emails
 """
@@ -168,7 +169,7 @@ def get_start_date() -> str:
 
     return start_date
 
-def main_menu(label=None, separate_files=False):
+def main_menu(label=None, separate_files=False, content_focus=None):
     """Display the main menu and handle user interaction"""
     display_banner()
 
@@ -193,7 +194,7 @@ def main_menu(label=None, separate_files=False):
             console.print("[yellow]No transcripts found. Exiting.[/yellow]")
             return
 
-        analyzer = ContentAnalyzer()
+        analyzer = ContentAnalyzer(content_focus=content_focus)
 
         while True:
             display_transcripts(transcripts)
@@ -330,7 +331,7 @@ def list_emails_only(start_date=None, label=None):
     display_transcripts(transcripts)
 
 
-def analyze_specific_email(email_subject, start_date=None, label=None, separate_files=False):
+def analyze_specific_email(email_subject, start_date=None, label=None, separate_files=False, content_focus=None):
     """Analyze a specific email by subject line (supports partial matching)"""
     console.print("[bold]Connecting to Gmail...[/bold]")
     gmail = GmailClient(start_date=start_date, label=label)
@@ -365,7 +366,7 @@ def analyze_specific_email(email_subject, start_date=None, label=None, separate_
         if choice.lower() == 'all':
             console.print(f"\n[bold]Analyzing all {len(matches)} matching transcripts...[/bold]\n")
 
-            analyzer = ContentAnalyzer()
+            analyzer = ContentAnalyzer(content_focus=content_focus)
 
             results = []
             for idx, transcript in enumerate(matches, 1):
@@ -404,7 +405,7 @@ def analyze_specific_email(email_subject, start_date=None, label=None, separate_
     # Analyze the selected transcript
     console.print(f"\n[bold cyan]Analyzing: {transcript['topic']}[/bold cyan]\n")
 
-    analyzer = ContentAnalyzer()
+    analyzer = ContentAnalyzer(content_focus=content_focus)
     result = analyzer.analyze_transcript(transcript)
     display_analysis(result)
 
@@ -420,12 +421,14 @@ if __name__ == "__main__":
 Examples:
   python cli.py                           # Interactive mode (combined output by default)
   python cli.py --separate-files          # Interactive mode with separate files
+  python cli.py --focus "product management for SaaS"  # Custom content focus
   python cli.py --email "Notes: Meeting"  # Analyze specific email by subject
   python cli.py --email "Daily Sync"      # Partial match works too
   python cli.py --list                    # List all available emails
   python cli.py --list --start-date 10232025  # List emails from date onwards
   python cli.py --list --label "AIQ"      # List emails with label "AIQ"
   python cli.py --email "Meeting" --label "Priority"  # Analyze with label filter
+  python cli.py --focus "DevOps best practices" --separate-files  # Combine flags
         """
     )
     parser.add_argument(
@@ -450,6 +453,10 @@ Examples:
         action='store_true',
         help='Save each analysis to a separate file (default: save all analyses to one combined file)'
     )
+    parser.add_argument(
+        '--focus',
+        help='Content focus for article generation (default: AI strategy and innovation for business leaders)'
+    )
 
     args = parser.parse_args()
 
@@ -458,6 +465,7 @@ Examples:
         start_date = args.start_date or os.getenv('START_DATE', '').strip()
         label = args.label
         separate_files = args.separate_files
+        content_focus = args.focus
 
         if args.list:
             # List mode
@@ -467,11 +475,11 @@ Examples:
         elif args.email:
             # Direct email analysis mode
             display_banner()
-            analyze_specific_email(args.email, start_date, label, separate_files)
+            analyze_specific_email(args.email, start_date, label, separate_files, content_focus)
 
         else:
             # Interactive mode (default)
-            main_menu(label=label, separate_files=separate_files)
+            main_menu(label=label, separate_files=separate_files, content_focus=content_focus)
 
     except KeyboardInterrupt:
         console.print("\n\n[bold blue]Thanks for using Qwilo. If you have improvement ideas, please email them to stephen@synaptiq.ai :)[/bold blue]\n")

@@ -1,9 +1,10 @@
 # Qwilo - Article Idea Generator
 
-An interactive CLI tool that fetches Gemini conversation transcripts from Gmail and analyzes them to generate article content suggestions focused on AI strategy and innovation for business leaders.
+An interactive CLI tool that fetches Gemini conversation transcripts from Gmail and analyzes them to generate article content suggestions. The content focus is fully configurable - by default it targets AI strategy and innovation for business leaders, but can be customized for any domain.
 
 ## Features
 
+- **Configurable Content Focus** - Customize the analysis angle for any domain (AI strategy, product management, marketing, DevOps, etc.)
 - Fetches transcripts from Gmail with subject pattern: `Notes: "[Subject]" [MMM DD, YYYY]`
 - Extracts full transcripts from Google Docs (prefers Transcript tab over Summary)
 - Interactive CLI with ASCII art logo and rich terminal UI
@@ -14,7 +15,7 @@ An interactive CLI tool that fetches Gemini conversation transcripts from Gmail 
   - Key insights specific to each topic
   - Notable verbatim quotes with speaker attribution
 - Save analysis results to markdown files
-- Batch processing support
+- Batch processing support with combined or separate file output
 
 ## Prerequisites
 
@@ -86,6 +87,12 @@ pip install -r requirements.txt
    # Required: Your Anthropic API key
    ANTHROPIC_API_KEY=your_actual_api_key_here
 
+   # Optional: Content focus for article generation
+   # Default: AI strategy and innovation for business leaders
+   # Customize this to change the angle/perspective of generated articles
+   # Example: CONTENT_FOCUS=product management best practices for SaaS companies
+   CONTENT_FOCUS=
+
    # Optional: Set a start date to only analyze transcripts from this date forward
    # Format: MMDDYYYY (e.g., 10232025 for October 23, 2025)
    # Leave blank to analyze all transcripts
@@ -152,6 +159,13 @@ Analyze a specific email by subject (supports partial matching):
 python3 cli.py --email "Meeting Notes"
 ```
 
+Customize content focus (overrides CONTENT_FOCUS environment variable):
+```bash
+python3 cli.py --focus "product management for SaaS companies"
+python3 cli.py --focus "DevOps best practices"
+python3 cli.py --focus "marketing strategies for B2B"
+```
+
 Filter by Gmail label:
 ```bash
 python3 cli.py --label "blog-potential"
@@ -163,9 +177,16 @@ Filter by start date:
 python3 cli.py --start-date 10232025
 ```
 
-Combine filters:
+Output options:
+```bash
+python3 cli.py --separate-files  # Save each analysis to separate file (default: combined)
+```
+
+Combine multiple options:
 ```bash
 python3 cli.py --label "blog-potential" --email "Strategy"
+python3 cli.py --focus "engineering leadership" --separate-files
+python3 cli.py --email "Product" --focus "product management" --label "priority"
 ```
 
 ### Interactive Menu Options
@@ -175,7 +196,8 @@ Once the application starts, you'll see:
 1. **List of available transcripts** - Shows all emails matching the subject pattern
 2. **Analysis options:**
    - Enter a number (e.g., `1`) - Analyze a specific transcript
-   - Enter `all` - Analyze all transcripts sequentially
+   - Enter `all` - Analyze all transcripts sequentially (with display and prompts)
+   - Enter `batch` - Batch process all transcripts (skip display, auto-save)
    - Enter `range` (e.g., `1-5`) - Analyze a range of transcripts
    - Enter `q` - Quit the application
 
@@ -183,6 +205,41 @@ Once the application starts, you'll see:
    - View the results in formatted markdown
    - Choose to save the analysis to a file
    - Continue to the next transcript or return to the menu
+
+**Batch Mode:** Selecting `batch` processes all transcripts without displaying analysis or prompting for confirmations. Perfect for processing many transcripts quickly - the tool will automatically save results to a combined file when done.
+
+### Content Focus Customization
+
+The analysis can be customized to focus on any domain or perspective. This changes how Claude analyzes the transcripts and generates article suggestions.
+
+**Three ways to set content focus (in priority order):**
+
+1. **Command-line flag (highest priority)** - Overrides all other settings:
+   ```bash
+   python3 cli.py --focus "product management for SaaS companies"
+   ```
+
+2. **Environment variable** - Set in `.env` file for persistent custom focus:
+   ```bash
+   CONTENT_FOCUS=DevOps best practices for enterprise teams
+   ```
+
+3. **Default** - If not specified, defaults to "AI strategy and innovation for business leaders"
+
+**Example use cases:**
+
+- **Product Management:** `--focus "product management best practices for SaaS"`
+- **Engineering Leadership:** `--focus "engineering leadership and team management"`
+- **DevOps:** `--focus "DevOps and infrastructure automation strategies"`
+- **Marketing:** `--focus "B2B marketing strategies for tech companies"`
+- **Sales:** `--focus "enterprise sales techniques and customer success"`
+- **Design:** `--focus "UX design principles and user research"`
+
+The content focus affects:
+- Article topic recommendations
+- Key insights extraction
+- The angle and perspective of the analysis
+- Which aspects of the conversation are emphasized
 
 ### Date Filtering
 
@@ -319,12 +376,14 @@ pip install -r requirements.txt
 
 ## Tips for Best Results
 
-1. **Choose transcripts with full Transcript tabs** - These contain speaker names and verbatim dialogue
-2. **Use label filtering** - Tag important conversations in Gmail with labels like "Blog potential"
-3. **Review transcripts before analyzing** - The quality of analysis depends on transcript quality
-4. **Save important analyses** - Use the save feature to keep analyses you want to reference
-5. **Batch process related topics** - Use the range feature to analyze related conversations together
-6. **Refine topics** - The AI suggestions are starting points; use your editorial judgment
+1. **Customize content focus for your domain** - Use `--focus` to tailor analysis to your specific industry or content area
+2. **Choose transcripts with full Transcript tabs** - These contain speaker names and verbatim dialogue
+3. **Use label filtering** - Tag important conversations in Gmail with labels like "Blog potential"
+4. **Review transcripts before analyzing** - The quality of analysis depends on transcript quality
+5. **Save important analyses** - Use the save feature to keep analyses you want to reference
+6. **Batch process related topics** - Use the `batch` option to analyze many conversations quickly
+7. **Combine options effectively** - Mix `--focus`, `--label`, and `--email` to target specific content areas
+8. **Refine topics** - The AI suggestions are starting points; use your editorial judgment
 
 ## Security Notes
 

@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class ContentAnalyzer:
-    def __init__(self):
+    def __init__(self, content_focus=None):
         api_key = os.getenv('ANTHROPIC_API_KEY')
         if not api_key:
             raise ValueError(
@@ -17,6 +17,13 @@ class ContentAnalyzer:
         # Load filter settings
         self.excluded_people = self._parse_csv_env('EXCLUDE_PEOPLE')
         self.excluded_subjects = self._parse_csv_env('EXCLUDE_SUBJECTS')
+
+        # Set content focus (default: AI strategy for business leaders)
+        if content_focus:
+            self.content_focus = content_focus
+        else:
+            self.content_focus = os.getenv('CONTENT_FOCUS', '').strip() or \
+                               'AI strategy and innovation for business leaders'
 
     def _parse_csv_env(self, env_var: str) -> list:
         """Parse comma-separated environment variable into list"""
@@ -48,7 +55,7 @@ class ContentAnalyzer:
         Returns:
             Dict with keys: recommended_topics, key_insights, quotes
         """
-        prompt = f"""You are analyzing a conversation transcript for a newsletter that focuses on helping business leaders raise their understanding, decision-making, and execution around AI strategy and innovation.
+        prompt = f"""You are analyzing a conversation transcript for content focused on {self.content_focus}.
 
 Conversation Topic: {transcript['topic']}
 Date: {transcript['date']}
@@ -66,7 +73,7 @@ IMPORTANT INSTRUCTIONS:
 - Extract ACTUAL verbatim quotes from the transcript text
 - Include the speaker's name next to each quote in the format: **[Name]:**
 - Make insights actionable and specific
-- Focus on content that helps business leaders make better strategic decisions about AI
+- Focus on content relevant to {self.content_focus}
 
 Format your response EXACTLY as follows:
 
