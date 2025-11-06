@@ -9,6 +9,7 @@ class GoogleDocsClient:
     def __init__(self, credentials_path='token.pickle'):
         """Initialize Google Docs client using existing credentials"""
         self.service = None
+        self.drive_service = None
         self.load_credentials(credentials_path)
 
     def load_credentials(self, credentials_path):
@@ -29,6 +30,34 @@ class GoogleDocsClient:
                     pickle.dump(creds, token)
 
         self.service = build('docs', 'v1', credentials=creds)
+        self.drive_service = build('drive', 'v3', credentials=creds)
+
+    def get_plain_document_content(self, document_id: str) -> str:
+        """
+        Fetch text content from a plain Google Doc (no tabs).
+        Optimized for documents without tab structure (e.g., from Drive folders).
+
+        Args:
+            document_id: The ID of the Google Doc
+
+        Returns:
+            str: The full text content of the document
+        """
+        try:
+            # Get document without tabs content for better performance
+            document = self.service.documents().get(
+                documentId=document_id
+            ).execute()
+
+            # Extract content from document body
+            doc_content = document.get('body', {}).get('content', [])
+            all_content = self._extract_content_from_elements(doc_content)
+
+            return ''.join(all_content)
+
+        except HttpError as error:
+            print(f'An error occurred fetching document {document_id}: {error}')
+            return ''
 
     def get_document_content(self, document_id: str, prefer_transcript: bool = True) -> str:
         """
@@ -141,3 +170,183 @@ class GoogleDocsClient:
         if match:
             return match.group(1)
         return url  # Return as-is if not a URL pattern
+
+    def create_document(self, title: str, content: str, folder_id: str = None) -> dict:
+        """
+        Create a new Google Doc with markdown-formatted content converted to proper formatting
+
+        Args:
+            title: Document title
+            content: Markdown content to convert and insert
+            folder_id: Optional Google Drive folder ID to place the document
+
+        Returns:
+            dict: Document metadata with 'id' and 'url'
+        """
+        try:
+            # Create a new document
+            doc = self.service.documents().create(body={'title': title}).execute()
+            doc_id = doc.get('documentId')
+
+            # Parse markdown and generate formatting requests
+            requests = self._convert_markdown_to_docs_requests(content)
+
+            # Apply all formatting in a single batch
+            if requests:
+                self.service.documents().batchUpdate(
+                    documentId=doc_id,
+                    body={'requests': requests}
+                ).execute()
+
+            # Move to folder if specified
+            if folder_id:
+                self._move_to_folder(doc_id, folder_id)
+
+            doc_url = f"https://docs.google.com/document/d/{doc_id}/edit"
+
+            return {
+                'id': doc_id,
+                'url': doc_url,
+                'title': title
+            }
+
+        except HttpError as error:
+            print(f'An error occurred creating document: {error}')
+            return None
+
+    def _convert_markdown_to_docs_requests(self, content: str) -> list:
+        """
+        Convert markdown content to Google Docs API formatting requests
+
+        Args:
+            content: Markdown-formatted string
+
+        Returns:
+            list: Google Docs API requests for formatted content
+        """
+        import re
+
+        requests = []
+        lines = content.split('\n')
+        current_index = 1  # Google Docs index starts at 1
+
+        # First pass: Insert all text
+        full_text = []
+        formatting_map = []  # Track (start_index, end_index, format_type, level)
+
+        for line in lines:
+            line_start = len(''.join(full_text))
+
+            # Check for headers
+            if line.startswith('## '):
+                clean_line = line[3:] + '\n'
+                full_text.append(clean_line)
+                formatting_map.append((line_start, line_start + len(clean_line) - 1, 'heading', 2))
+            elif line.startswith('# '):
+                clean_line = line[2:] + '\n'
+                full_text.append(clean_line)
+                formatting_map.append((line_start, line_start + len(clean_line) - 1, 'heading', 1))
+            # Check for horizontal rules (skip them or convert to line break)
+            elif line.strip() == '---' or line.strip().startswith('────'):
+                full_text.append('\n')
+            else:
+                # Handle inline formatting (bold, quotes, bullets)
+                processed_line = line + '\n'
+
+                # Track bold formatting
+                bold_pattern = r'\*\*([^*]+)\*\*'
+                for match in re.finditer(bold_pattern, line):
+                    # Calculate position in full text
+                    match_start = line_start + match.start()
+                    match_end = line_start + match.end() - 4  # Subtract the ** markers
+                    formatting_map.append((match_start, match_end, 'bold', None))
+
+                # Remove markdown syntax for the actual text
+                processed_line = re.sub(r'\*\*([^*]+)\*\*', r'\1', processed_line)
+
+                # Handle blockquotes (lines starting with >)
+                if line.strip().startswith('>'):
+                    processed_line = '    ' + processed_line.lstrip('> ')  # Indent instead
+
+                # Handle bullet points (lines starting with •)
+                if line.strip().startswith('•'):
+                    # Keep the bullet
+                    pass
+
+                full_text.append(processed_line)
+
+        full_text_str = ''.join(full_text)
+
+        # Insert all text at once
+        requests.append({
+            'insertText': {
+                'location': {'index': 1},
+                'text': full_text_str
+            }
+        })
+
+        # Apply formatting (must be done after text insertion)
+        # Sort by start position (descending) to apply from end to start
+        formatting_map.sort(key=lambda x: x[0], reverse=True)
+
+        for start_idx, end_idx, format_type, level in formatting_map:
+            # Adjust indices (Google Docs is 1-indexed)
+            start_idx += 1
+            end_idx += 1
+
+            if format_type == 'heading':
+                requests.append({
+                    'updateParagraphStyle': {
+                        'range': {
+                            'startIndex': start_idx,
+                            'endIndex': end_idx
+                        },
+                        'paragraphStyle': {
+                            'namedStyleType': f'HEADING_{level}'
+                        },
+                        'fields': 'namedStyleType'
+                    }
+                })
+            elif format_type == 'bold':
+                requests.append({
+                    'updateTextStyle': {
+                        'range': {
+                            'startIndex': start_idx,
+                            'endIndex': end_idx
+                        },
+                        'textStyle': {
+                            'bold': True
+                        },
+                        'fields': 'bold'
+                    }
+                })
+
+        return requests
+
+    def _move_to_folder(self, document_id: str, folder_id: str):
+        """
+        Move a document to a specific folder
+
+        Args:
+            document_id: The ID of the document to move
+            folder_id: The ID of the destination folder
+        """
+        try:
+            # Get the file's current parents
+            file = self.drive_service.files().get(
+                fileId=document_id,
+                fields='parents'
+            ).execute()
+
+            previous_parents = ",".join(file.get('parents', []))
+
+            # Move the file to the new folder
+            self.drive_service.files().update(
+                fileId=document_id,
+                addParents=folder_id,
+                removeParents=previous_parents,
+                fields='id, parents'
+            ).execute()
+
+        except HttpError as error:
+            print(f'An error occurred moving document to folder: {error}')

@@ -1,18 +1,25 @@
 import os
 from typing import Dict
-from anthropic import Anthropic
 from dotenv import load_dotenv
 
 load_dotenv()
 
 class ContentAnalyzer:
     def __init__(self, content_focus=None):
-        api_key = os.getenv('ANTHROPIC_API_KEY')
-        if not api_key:
-            raise ValueError(
-                "ANTHROPIC_API_KEY not found. Please set it in your .env file."
-            )
-        self.client = Anthropic(api_key=api_key)
+        # Determine AI provider and model
+        self.provider = os.getenv('AI_PROVIDER', 'openai').lower()
+
+        # Default models for each provider
+        default_models = {
+            'anthropic': 'claude-3-5-haiku-20241022',
+            'openai': 'gpt-4o-mini',
+            'google': 'gemini-1.5-flash'
+        }
+
+        self.model = os.getenv('AI_MODEL', default_models.get(self.provider, 'gpt-4o-mini'))
+
+        # Initialize the appropriate client
+        self._init_client()
 
         # Load filter settings
         self.excluded_people = self._parse_csv_env('EXCLUDE_PEOPLE')
@@ -24,6 +31,33 @@ class ContentAnalyzer:
         else:
             self.content_focus = os.getenv('CONTENT_FOCUS', '').strip() or \
                                'AI strategy and innovation for business leaders'
+
+    def _init_client(self):
+        """Initialize the appropriate AI client based on provider"""
+        if self.provider == 'anthropic':
+            from anthropic import Anthropic
+            api_key = os.getenv('ANTHROPIC_API_KEY')
+            if not api_key:
+                raise ValueError("ANTHROPIC_API_KEY not found. Please set it in your .env file.")
+            self.client = Anthropic(api_key=api_key)
+
+        elif self.provider == 'openai':
+            from openai import OpenAI
+            api_key = os.getenv('OPENAI_API_KEY')
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY not found. Please set it in your .env file.")
+            self.client = OpenAI(api_key=api_key)
+
+        elif self.provider == 'google':
+            import google.generativeai as genai
+            api_key = os.getenv('GOOGLE_API_KEY')
+            if not api_key:
+                raise ValueError("GOOGLE_API_KEY not found. Please set it in your .env file.")
+            genai.configure(api_key=api_key)
+            self.client = genai.GenerativeModel(self.model)
+
+        else:
+            raise ValueError(f"Unsupported AI provider: {self.provider}. Use 'anthropic', 'openai', or 'google'.")
 
     def _parse_csv_env(self, env_var: str) -> list:
         """Parse comma-separated environment variable into list"""
@@ -48,14 +82,9 @@ class ContentAnalyzer:
 
         return False
 
-    def analyze_transcript(self, transcript: Dict) -> Dict:
-        """
-        Analyze a transcript and generate newsletter content suggestions
-
-        Returns:
-            Dict with keys: recommended_topics, key_insights, quotes
-        """
-        prompt = f"""You are analyzing a conversation transcript for content focused on {self.content_focus}.
+    def _create_prompt(self, transcript: Dict) -> str:
+        """Create the analysis prompt"""
+        return f"""You are analyzing a conversation transcript for content focused on {self.content_focus}.
 
 Conversation Topic: {transcript['topic']}
 Date: {transcript['date']}
@@ -108,16 +137,53 @@ Format your response EXACTLY as follows:
 
 Continue this format for all topics (2-4 total)."""
 
-        try:
-            message = self.client.messages.create(
-                model="claude-sonnet-4-5-20250929",
-                max_tokens=4000,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
-            )
+    def _call_anthropic(self, prompt: str) -> str:
+        """Call Anthropic API"""
+        message = self.client.messages.create(
+            model=self.model,
+            max_tokens=4000,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return message.content[0].text
 
-            analysis = message.content[0].text
+    def _call_openai(self, prompt: str) -> str:
+        """Call OpenAI API"""
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=4000,
+            temperature=0.7
+        )
+        return response.choices[0].message.content
+
+    def _call_google(self, prompt: str) -> str:
+        """Call Google Gemini API"""
+        response = self.client.generate_content(prompt)
+        return response.text
+
+    def analyze_transcript(self, transcript: Dict) -> Dict:
+        """
+        Analyze a transcript and generate newsletter content suggestions
+
+        Returns:
+            Dict with keys: recommended_topics, key_insights, quotes
+        """
+        prompt = self._create_prompt(transcript)
+
+        try:
+            # Call the appropriate provider
+            if self.provider == 'anthropic':
+                analysis = self._call_anthropic(prompt)
+            elif self.provider == 'openai':
+                analysis = self._call_openai(prompt)
+            elif self.provider == 'google':
+                analysis = self._call_google(prompt)
+            else:
+                raise ValueError(f"Unsupported provider: {self.provider}")
 
             # Add source information to the analysis
             analysis_with_source = f"**Source:** {transcript['subject']}\n\n{analysis}"
@@ -133,7 +199,7 @@ Continue this format for all topics (2-4 total)."""
             return {
                 'topic': transcript['topic'],
                 'date': transcript['date'],
-                'error': f"Error analyzing transcript: {str(e)}"
+                'error': f"Error analyzing transcript with {self.provider}/{self.model}: {str(e)}"
             }
 
     def batch_analyze(self, transcripts: list) -> list:

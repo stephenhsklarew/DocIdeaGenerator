@@ -16,7 +16,9 @@ load_dotenv()
 
 SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly',
-    'https://www.googleapis.com/auth/drive.readonly'
+    'https://www.googleapis.com/auth/drive.readonly',
+    'https://www.googleapis.com/auth/documents',  # For creating/editing Google Docs
+    'https://www.googleapis.com/auth/drive.file'   # For creating files in Drive
 ]
 
 class GmailClient:

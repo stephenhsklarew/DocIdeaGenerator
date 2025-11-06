@@ -3,11 +3,17 @@
 Newsletter Transcript Analyzer - AI Strategy & Innovation Content Generator
 
 Usage:
+  # Gmail mode (default)
   python cli.py                           # Interactive mode (combined output by default)
   python cli.py --separate-files          # Save each analysis to separate files
   python cli.py --focus "custom topic"    # Override content focus
   python cli.py --email "Notes: Meeting"  # Analyze specific email by subject
   python cli.py --list                    # List all available emails
+
+  # Drive mode
+  python cli.py --source drive            # Scan Google Drive folder (uses DRIVE_FOLDER_ID from .env)
+  python cli.py --source drive --folder-id ABC123  # Use specific folder
+  python cli.py --source drive --separate-files    # Drive mode with separate output files
 """
 import sys
 import os
@@ -19,6 +25,8 @@ from rich.panel import Panel
 from rich.markdown import Markdown
 from rich.prompt import Prompt, Confirm
 from gmail_client import GmailClient
+from google_drive_client import GoogleDriveClient
+from google_docs_client import GoogleDocsClient
 from content_analyzer import ContentAnalyzer
 from dotenv import load_dotenv
 
@@ -91,28 +99,55 @@ def display_analysis(result):
     console.print(md)
     console.print("\n" + "="*80 + "\n")
 
-def save_analysis(result, filename=None):
-    """Save analysis to a file"""
+def save_analysis(result, save_local=False, docs_client=None):
+    """Save analysis to Google Docs (default) or local file"""
     if 'error' in result:
         console.print("[red]Cannot save analysis with errors.[/red]")
         return
 
-    if not filename:
+    # Prepare content
+    content = f"# {result['topic']}\n"
+    content += f"**Date:** {result['date']}\n\n"
+    content += "---\n\n"
+    content += result['analysis']
+
+    if save_local:
+        # Save as local markdown file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_topic = "".join(c for c in result['topic'] if c.isalnum() or c in (' ', '-', '_')).strip()
         safe_topic = safe_topic.replace(' ', '_')[:50]
         filename = f"analysis_{safe_topic}_{timestamp}.md"
 
-    with open(filename, 'w', encoding='utf-8') as f:
-        f.write(f"# {result['topic']}\n")
-        f.write(f"**Date:** {result['date']}\n\n")
-        f.write("---\n\n")
-        f.write(result['analysis'])
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.write(content)
 
-    console.print(f"[green]Analysis saved to: {filename}[/green]")
+        console.print(f"[green]Analysis saved to: {filename}[/green]")
+    else:
+        # Save as Google Doc (default)
+        if not docs_client:
+            docs_client = GoogleDocsClient()
 
-def save_combined_analysis(results, filename=None):
-    """Save multiple analyses to a single combined file"""
+        output_folder_id = os.getenv('OUTPUT_FOLDER_ID')
+        if not output_folder_id:
+            console.print("[yellow]Warning: OUTPUT_FOLDER_ID not set in .env. Document will be created in root Drive folder.[/yellow]")
+
+        # Document title is just MMDDYYYY
+        doc_title = datetime.now().strftime("%m%d%Y")
+
+        doc_info = docs_client.create_document(
+            title=doc_title,
+            content=content,
+            folder_id=output_folder_id
+        )
+
+        if doc_info:
+            console.print(f"[green]✓ Analysis saved to Google Doc: {doc_title}[/green]")
+            console.print(f"[cyan]View at: {doc_info['url']}[/cyan]")
+        else:
+            console.print("[red]Failed to create Google Doc. Use --save-local flag to save as markdown instead.[/red]")
+
+def save_combined_analysis(results, save_local=False, docs_client=None):
+    """Save multiple analyses to a single combined Google Doc or file"""
     # Filter out results with errors
     valid_results = [r for r in results if 'error' not in r]
 
@@ -120,30 +155,58 @@ def save_combined_analysis(results, filename=None):
         console.print("[red]No valid analyses to save.[/red]")
         return
 
-    if not filename:
+    # Prepare combined content
+    content = "# Combined Analysis Report\n\n"
+    content += f"**Generated:** {datetime.now().strftime('%B %d, %Y at %I:%M %p')}\n"
+    content += f"**Total Transcripts:** {len(valid_results)}\n\n"
+    content += "---\n\n"
+
+    for idx, result in enumerate(valid_results, 1):
+        # Add section header for each transcript
+        content += f"# {idx}. {result['topic']}\n"
+        content += f"**Date:** {result['date']}\n\n"
+        content += "---\n\n"
+        content += result['analysis']
+        content += "\n\n"
+
+        # Add separator between sections (except after the last one)
+        if idx < len(valid_results):
+            content += "\n" + "="*80 + "\n\n"
+
+    if save_local:
+        # Save as local markdown file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"analysis_combined_{timestamp}.md"
 
-    with open(filename, 'w', encoding='utf-8') as f:
-        f.write("# Combined Analysis Report\n\n")
-        f.write(f"**Generated:** {datetime.now().strftime('%B %d, %Y at %I:%M %p')}\n")
-        f.write(f"**Total Transcripts:** {len(valid_results)}\n\n")
-        f.write("---\n\n")
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.write(content)
 
-        for idx, result in enumerate(valid_results, 1):
-            # Add section header for each transcript
-            f.write(f"# {idx}. {result['topic']}\n")
-            f.write(f"**Date:** {result['date']}\n\n")
-            f.write("---\n\n")
-            f.write(result['analysis'])
-            f.write("\n\n")
+        console.print(f"[green]Combined analysis saved to: {filename}[/green]")
+        console.print(f"[green]Saved {len(valid_results)} transcript(s) to a single file[/green]")
+    else:
+        # Save as Google Doc (default)
+        if not docs_client:
+            docs_client = GoogleDocsClient()
 
-            # Add separator between sections (except after the last one)
-            if idx < len(valid_results):
-                f.write("\n" + "="*80 + "\n\n")
+        output_folder_id = os.getenv('OUTPUT_FOLDER_ID')
+        if not output_folder_id:
+            console.print("[yellow]Warning: OUTPUT_FOLDER_ID not set in .env. Document will be created in root Drive folder.[/yellow]")
 
-    console.print(f"[green]Combined analysis saved to: {filename}[/green]")
-    console.print(f"[green]Saved {len(valid_results)} transcript(s) to a single file[/green]")
+        # Document title is just MMDDYYYY
+        doc_title = datetime.now().strftime("%m%d%Y")
+
+        doc_info = docs_client.create_document(
+            title=doc_title,
+            content=content,
+            folder_id=output_folder_id
+        )
+
+        if doc_info:
+            console.print(f"[green]✓ Combined analysis saved to Google Doc: {doc_title}[/green]")
+            console.print(f"[cyan]View at: {doc_info['url']}[/cyan]")
+            console.print(f"[green]Saved {len(valid_results)} transcript(s) to a single document[/green]")
+        else:
+            console.print("[red]Failed to create Google Doc. Use --save-local flag to save as markdown instead.[/red]")
 
 def get_start_date() -> str:
     """Prompt for start date if not in environment"""
@@ -169,7 +232,178 @@ def get_start_date() -> str:
 
     return start_date
 
-def main_menu(label=None, separate_files=False, content_focus=None):
+def main_menu_drive(folder_id=None, name_pattern=None, modified_after=None, separate_files=False, content_focus=None, save_local=False):
+    """Display the main menu and handle user interaction for Drive mode"""
+    display_banner()
+
+    try:
+        console.print("[bold]Connecting to Google Drive...[/bold]")
+        drive_client = GoogleDriveClient(folder_id=folder_id)
+        docs_client = GoogleDocsClient()
+        console.print("[green]✓ Connected successfully![/green]\n")
+
+        if drive_client.folder_id:
+            console.print(f"[cyan]Scanning folder: {drive_client.folder_id}[/cyan]")
+        if drive_client.recursive:
+            console.print(f"[cyan]Recursive scan: Enabled[/cyan]")
+
+        console.print("[bold]Fetching documents...[/bold]")
+        documents = drive_client.list_documents(
+            name_pattern=name_pattern,
+            modified_after=modified_after
+        )
+
+        if not documents:
+            console.print("[yellow]No documents found in the folder. Exiting.[/yellow]")
+            return
+
+        # Convert Drive documents to transcript format for compatibility
+        transcripts = []
+        console.print(f"[bold]Loading content from {len(documents)} documents...[/bold]")
+
+        for doc in documents:
+            console.print(f"  → Loading: {doc['name']}")
+            content = docs_client.get_plain_document_content(doc['id'])
+
+            if content:
+                # Parse date from modified time
+                try:
+                    dt = datetime.fromisoformat(doc['modified'].replace('Z', '+00:00'))
+                    date_str = dt.strftime('%b %d, %Y')
+                except:
+                    date_str = doc.get('modified', 'Unknown date')
+
+                transcripts.append({
+                    'id': doc['id'],
+                    'subject': doc['name'],  # Use document name as subject
+                    'topic': doc['name'],
+                    'date': date_str,
+                    'body': content,
+                    'source': 'drive',
+                    'folder_path': doc.get('folder_path', '')
+                })
+
+        console.print(f"[green]✓ Loaded {len(transcripts)} documents[/green]\n")
+
+        analyzer = ContentAnalyzer(content_focus=content_focus)
+
+        while True:
+            display_transcripts(transcripts)
+
+            console.print("[bold cyan]Options:[/bold cyan]")
+            console.print("  • Enter a number (1-{}) to analyze a specific document".format(len(transcripts)))
+            console.print("  • Enter 'all' to analyze all documents")
+            console.print("  • Enter 'batch' to batch process all (skip display, auto-save)")
+            console.print("  • Enter 'range' to analyze a range (e.g., 1-5)")
+            console.print("  • Enter 'q' to quit\n")
+
+            choice = Prompt.ask("What would you like to do?").strip().lower()
+
+            if choice == 'q':
+                console.print("\n[bold blue]Thanks for using Qwilo. If you have improvement ideas, please email them to stephen@synaptiq.ai :)[/bold blue]\n")
+                break
+
+            elif choice == 'all':
+                console.print(f"\n[bold]Analyzing {len(transcripts)} documents...[/bold]\n")
+
+                results = []
+                for idx, transcript in enumerate(transcripts, 1):
+                    console.print(f"[cyan]Analyzing {idx}/{len(transcripts)}: {transcript['topic']}[/cyan]")
+                    result = analyzer.analyze_transcript(transcript)
+                    display_analysis(result)
+                    results.append(result)
+
+                    if idx < len(transcripts):
+                        if not Confirm.ask("Continue to next document?", default=True):
+                            break
+
+                # Save results - either combined or separate files
+                if results and Confirm.ask("Save analysis?", default=True):
+                    if separate_files:
+                        console.print("\n[cyan]Saving separate files...[/cyan]")
+                        for result in results:
+                            save_analysis(result, save_local=save_local, docs_client=docs_client)
+                    else:
+                        save_combined_analysis(results, save_local=save_local, docs_client=docs_client)
+
+            elif choice == 'batch':
+                console.print(f"\n[bold cyan]Batch Mode:[/bold cyan] Processing {len(transcripts)} documents...\n")
+
+                results = []
+                for idx, transcript in enumerate(transcripts, 1):
+                    console.print(f"[cyan]Analyzing {idx}/{len(transcripts)}: {transcript['topic']}[/cyan]")
+                    result = analyzer.analyze_transcript(transcript)
+                    results.append(result)
+
+                # Auto-save results
+                if results:
+                    if separate_files:
+                        console.print("\n[cyan]Saving separate files...[/cyan]")
+                        for result in results:
+                            save_analysis(result, save_local=save_local, docs_client=docs_client)
+                    else:
+                        save_combined_analysis(results, save_local=save_local, docs_client=docs_client)
+
+            elif choice == 'range':
+                range_input = Prompt.ask("Enter range (e.g., 1-5)")
+                try:
+                    start, end = map(int, range_input.split('-'))
+                    if 1 <= start <= end <= len(transcripts):
+                        results = []
+                        for idx in range(start - 1, end):
+                            console.print(f"\n[cyan]Analyzing: {transcripts[idx]['topic']}[/cyan]")
+                            result = analyzer.analyze_transcript(transcripts[idx])
+                            display_analysis(result)
+                            results.append(result)
+
+                            if idx < end - 1:
+                                if not Confirm.ask("Continue to next document?", default=True):
+                                    break
+
+                        # Save results - either combined or separate files
+                        if results and Confirm.ask("Save analysis?", default=True):
+                            if separate_files:
+                                console.print("\n[cyan]Saving separate files...[/cyan]")
+                                for result in results:
+                                    save_analysis(result, save_local=save_local, docs_client=docs_client)
+                            else:
+                                save_combined_analysis(results, save_local=save_local, docs_client=docs_client)
+                    else:
+                        console.print("[red]Invalid range. Please try again.[/red]")
+                except ValueError:
+                    console.print("[red]Invalid format. Use format like: 1-5[/red]")
+
+            elif choice.isdigit():
+                idx = int(choice) - 1
+                if 0 <= idx < len(transcripts):
+                    transcript = transcripts[idx]
+                    console.print(f"\n[bold cyan]Analyzing: {transcript['topic']}[/bold cyan]\n")
+
+                    result = analyzer.analyze_transcript(transcript)
+                    display_analysis(result)
+
+                    if Confirm.ask("Save this analysis?", default=True):
+                        save_analysis(result)
+                else:
+                    console.print("[red]Invalid number. Please try again.[/red]")
+
+            else:
+                console.print("[red]Invalid option. Please try again.[/red]")
+
+            console.print("\n")
+
+    except FileNotFoundError as e:
+        console.print(f"[bold red]Setup Error:[/bold red] {e}")
+        console.print("\n[yellow]Please follow the setup instructions in README.md[/yellow]\n")
+    except ValueError as e:
+        console.print(f"[bold red]Configuration Error:[/bold red] {e}")
+        console.print("\n[yellow]Please check your .env file configuration[/yellow]\n")
+    except Exception as e:
+        console.print(f"[bold red]Error:[/bold red] {e}")
+        import traceback
+        console.print(traceback.format_exc())
+
+def main_menu(label=None, separate_files=False, content_focus=None, save_local=False):
     """Display the main menu and handle user interaction"""
     display_banner()
 
@@ -179,6 +413,7 @@ def main_menu(label=None, separate_files=False, content_focus=None):
 
         console.print("[bold]Connecting to Gmail...[/bold]")
         gmail = GmailClient(start_date=start_date, label=label)
+        docs_client = GoogleDocsClient()  # For saving to Google Docs
         console.print("[green]✓ Connected successfully![/green]\n")
 
         if label:
@@ -231,9 +466,9 @@ def main_menu(label=None, separate_files=False, content_focus=None):
                     if separate_files:
                         console.print("\n[cyan]Saving separate files...[/cyan]")
                         for result in results:
-                            save_analysis(result)
+                            save_analysis(result, save_local=save_local, docs_client=docs_client)
                     else:
-                        save_combined_analysis(results)
+                        save_combined_analysis(results, save_local=save_local, docs_client=docs_client)
 
             elif choice == 'batch':
                 console.print(f"\n[bold cyan]Batch Mode:[/bold cyan] Processing {len(transcripts)} transcripts...\n")
@@ -249,9 +484,9 @@ def main_menu(label=None, separate_files=False, content_focus=None):
                     if separate_files:
                         console.print("\n[cyan]Saving separate files...[/cyan]")
                         for result in results:
-                            save_analysis(result)
+                            save_analysis(result, save_local=save_local, docs_client=docs_client)
                     else:
-                        save_combined_analysis(results)
+                        save_combined_analysis(results, save_local=save_local, docs_client=docs_client)
 
             elif choice == 'range':
                 range_input = Prompt.ask("Enter range (e.g., 1-5)")
@@ -274,9 +509,9 @@ def main_menu(label=None, separate_files=False, content_focus=None):
                             if separate_files:
                                 console.print("\n[cyan]Saving separate files...[/cyan]")
                                 for result in results:
-                                    save_analysis(result)
+                                    save_analysis(result, save_local=save_local, docs_client=docs_client)
                             else:
-                                save_combined_analysis(results)
+                                save_combined_analysis(results, save_local=save_local, docs_client=docs_client)
                     else:
                         console.print("[red]Invalid range. Please try again.[/red]")
                 except ValueError:
@@ -331,10 +566,11 @@ def list_emails_only(start_date=None, label=None):
     display_transcripts(transcripts)
 
 
-def analyze_specific_email(email_subject, start_date=None, label=None, separate_files=False, content_focus=None):
+def analyze_specific_email(email_subject, start_date=None, label=None, separate_files=False, content_focus=None, save_local=False):
     """Analyze a specific email by subject line (supports partial matching)"""
     console.print("[bold]Connecting to Gmail...[/bold]")
     gmail = GmailClient(start_date=start_date, label=label)
+    docs_client = GoogleDocsClient()  # For saving to Google Docs
     console.print("[green]✓ Connected successfully![/green]\n")
 
     if label:
@@ -454,32 +690,72 @@ Examples:
         help='Save each analysis to a separate file (default: save all analyses to one combined file)'
     )
     parser.add_argument(
+        '--save-local',
+        action='store_true',
+        help='Save analysis as local markdown file instead of Google Doc (default: Google Doc)'
+    )
+    parser.add_argument(
         '--focus',
         help='Content focus for article generation (default: AI strategy and innovation for business leaders)'
+    )
+    parser.add_argument(
+        '--source',
+        choices=['gmail', 'drive'],
+        default=None,
+        help='Source mode: gmail (fetch from Gmail) or drive (scan Google Drive folder). Default: from SOURCE_MODE env or gmail'
+    )
+    parser.add_argument(
+        '--folder-id',
+        help='Google Drive folder ID (only for --source drive). Overrides DRIVE_FOLDER_ID from .env'
     )
 
     args = parser.parse_args()
 
     try:
-        # Get start date from args or environment
+        # Determine source mode
+        source_mode = args.source or os.getenv('SOURCE_MODE', 'gmail').lower()
+
+        # Get parameters
         start_date = args.start_date or os.getenv('START_DATE', '').strip()
         label = args.label
         separate_files = args.separate_files
         content_focus = args.focus
+        folder_id = args.folder_id  # For Drive mode
+        save_local = args.save_local  # Save as markdown instead of Google Doc
 
-        if args.list:
-            # List mode
-            display_banner()
-            list_emails_only(start_date, label)
+        # Route to appropriate mode
+        if source_mode == 'drive':
+            # Drive mode - Gmail-specific flags are ignored
+            if args.list or args.email or label:
+                console.print("[yellow]Warning: --list, --email, and --label flags are only for Gmail mode and will be ignored in Drive mode[/yellow]\n")
 
-        elif args.email:
-            # Direct email analysis mode
-            display_banner()
-            analyze_specific_email(args.email, start_date, label, separate_files, content_focus)
+            # Interactive Drive mode
+            main_menu_drive(
+                folder_id=folder_id,
+                modified_after=start_date,
+                separate_files=separate_files,
+                content_focus=content_focus,
+                save_local=save_local
+            )
 
         else:
-            # Interactive mode (default)
-            main_menu(label=label, separate_files=separate_files, content_focus=content_focus)
+            # Gmail mode (default)
+            if folder_id:
+                console.print("[yellow]Warning: --folder-id flag is only for Drive mode and will be ignored in Gmail mode[/yellow]\n")
+
+            if args.list:
+                # List mode
+                display_banner()
+                list_emails_only(start_date, label)
+
+            elif args.email:
+                # Direct email analysis mode
+                display_banner()
+                analyze_specific_email(args.email, start_date, label, separate_files, content_focus, save_local)
+
+            else:
+                # Interactive mode (default)
+                main_menu(label=label, separate_files=separate_files, content_focus=content_focus, save_local=save_local)
 
     except KeyboardInterrupt:
         console.print("\n\n[bold blue]Thanks for using Qwilo. If you have improvement ideas, please email them to stephen@synaptiq.ai :)[/bold blue]\n")

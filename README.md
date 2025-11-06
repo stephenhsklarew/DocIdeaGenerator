@@ -4,24 +4,36 @@ An interactive CLI tool that fetches Gemini conversation transcripts from Gmail 
 
 ## Features
 
+- **Dual Source Modes** - Fetch content from Gmail emails OR scan Google Drive folders
 - **Configurable Content Focus** - Customize the analysis angle for any domain (AI strategy, product management, marketing, DevOps, etc.)
-- Fetches transcripts from Gmail with subject pattern: `Notes: "[Subject]" [MMM DD, YYYY]`
-- Extracts full transcripts from Google Docs (prefers Transcript tab over Summary)
+- **Gmail Mode:**
+  - Fetches transcripts from Gmail with subject pattern: `Notes: "[Subject]" [MMM DD, YYYY]`
+  - Extracts full transcripts from Google Docs (prefers Transcript tab over Summary)
+  - Label-based filtering to focus on specific conversations
+- **Drive Mode:**
+  - Scan any Google Drive folder for transcript documents
+  - Recursive subfolder scanning (optional)
+  - Date filtering and name pattern matching
+- **Smart Output:**
+  - **Default:** Saves analysis as Google Docs in configured folder (named MMDDYYYY)
+  - **Optional:** Save as local markdown files with `--save-local` flag
+  - Automatic folder organization in Google Drive
 - Interactive CLI with ASCII art logo and rich terminal UI
-- Label-based filtering to focus on specific conversations
 - AI-powered content analysis using Claude API
 - Generates:
   - Recommended article topics (2-4 topics)
   - Key insights specific to each topic
   - Notable verbatim quotes with speaker attribution
-- Save analysis results to markdown files
 - Batch processing support with combined or separate file output
 
 ## Prerequisites
 
 - Python 3.8 or higher
 - Gmail account
-- Anthropic API key
+- **AI Provider API key** (choose one):
+  - **OpenAI** (default, most cost-effective): Get from [platform.openai.com](https://platform.openai.com/)
+  - **Anthropic**: Get from [console.anthropic.com](https://console.anthropic.com/)
+  - **Google Gemini** (FREE tier available): Get from [aistudio.google.com](https://aistudio.google.com/)
 - Google Cloud project with Gmail API, Google Docs API, and Google Drive API enabled
 
 ## Installation
@@ -82,10 +94,23 @@ pip install -r requirements.txt
    cp .env.example .env
    ```
 
-2. Edit `.env` and add your Anthropic API key:
+2. Edit `.env` and configure your AI provider:
    ```bash
-   # Required: Your Anthropic API key
-   ANTHROPIC_API_KEY=your_actual_api_key_here
+   # ===== AI PROVIDER CONFIGURATION =====
+   # Choose: anthropic, openai, or google
+   # Default: openai (most cost-effective)
+   AI_PROVIDER=openai
+
+   # Add your API key (only need one)
+   OPENAI_API_KEY=your_openai_api_key_here
+   # OR
+   # ANTHROPIC_API_KEY=your_anthropic_key_here
+   # OR
+   # GOOGLE_API_KEY=your_google_key_here
+
+   # Optional: Override default model
+   # Defaults: gpt-4o-mini (openai), claude-3-5-haiku (anthropic), gemini-1.5-flash (google)
+   # AI_MODEL=gpt-4o-mini
 
    # Optional: Content focus for article generation
    # Default: AI strategy and innovation for business leaders
@@ -106,9 +131,22 @@ pip install -r requirements.txt
    EXCLUDE_SUBJECTS=
    ```
 
-3. Get your Anthropic API key from [console.anthropic.com](https://console.anthropic.com/)
+3. Get your API key from your chosen provider (links above)
 
 **Important:** The `.env` file contains sensitive API keys and is automatically excluded from git via `.gitignore`.
+
+### AI Provider Cost Comparison
+
+For a typical 12K-word transcript analysis:
+
+| Provider | Model | Cost per Analysis | Monthly Cost (100 analyses) | Notes |
+|----------|-------|-------------------|----------------------------|--------|
+| **OpenAI** (default) | gpt-4o-mini | ~$0.005 | ~$0.50 | Best value, excellent quality |
+| Google | gemini-1.5-flash | FREE | FREE | 1,500 requests/day free tier |
+| Anthropic | claude-3-5-haiku | ~$0.035 | ~$3.50 | Premium quality, good value |
+| Anthropic | claude-sonnet-4 | ~$0.91 | ~$91 | Highest quality, expensive |
+
+**Recommendation:** Use the default **OpenAI gpt-4o-mini** for the best balance of cost and quality. Or try **Google Gemini Flash** if you want completely free (within limits).
 
 ### 5. First Run Authentication
 
@@ -134,20 +172,39 @@ article-idea-generator/
 
 ## Usage
 
+### Source Modes
+
+Qwilo supports two source modes:
+
+**Gmail Mode (Default):**
+- Fetches emails from Gmail with specific subject patterns
+- Requires Gmail authentication
+- Supports label filtering
+
+**Drive Mode:**
+- Scans Google Drive folders for transcript documents
+- Works with any plain Google Docs (no special formatting required)
+- Supports recursive subfolder scanning
+
 ### Basic Usage
 
-Run the interactive CLI:
+**Gmail Mode (default):**
 ```bash
 python3 cli.py
+```
+
+**Drive Mode:**
+```bash
+python3 cli.py --source drive
 ```
 
 Or make it executable:
 ```bash
 chmod +x cli.py
-./cli.py
+./cli.py --source drive
 ```
 
-### Command-Line Options
+### Gmail Mode Command-Line Options
 
 List all available transcripts:
 ```bash
@@ -189,11 +246,71 @@ python3 cli.py --focus "engineering leadership" --separate-files
 python3 cli.py --email "Product" --focus "product management" --label "priority"
 ```
 
+### Drive Mode Command-Line Options
+
+Use a specific Google Drive folder:
+```bash
+python3 cli.py --source drive --folder-id 1a2b3c4d5e6f7g8h9i0j
+```
+
+**How to find your folder ID:**
+1. Open the folder in Google Drive
+2. Copy the ID from the URL: `https://drive.google.com/drive/folders/FOLDER_ID`
+3. The FOLDER_ID is the long string after `/folders/`
+
+Combine with content focus:
+```bash
+python3 cli.py --source drive --focus "product management best practices"
+```
+
+Save to separate files:
+```bash
+python3 cli.py --source drive --separate-files
+```
+
+**Configuration via .env:**
+```bash
+# Set default source mode and folder in .env
+SOURCE_MODE=drive
+DRIVE_FOLDER_ID=your_folder_id_here
+DRIVE_RECURSIVE=true  # Enable recursive subfolder scanning
+```
+
+Then simply run:
+```bash
+python3 cli.py  # Will use Drive mode with configured folder
+```
+
+### Output Options
+
+**Default: Google Docs (Automatic)**
+```bash
+python3 cli.py  # Saves to Google Doc in OUTPUT_FOLDER_ID
+python3 cli.py --source drive  # Same for Drive mode
+```
+- Analysis saved as Google Doc with name: `MMDDYYYY` (e.g., `11062024`)
+- Automatically placed in configured output folder
+- Returns clickable URL to view document
+
+**Optional: Local Markdown Files**
+```bash
+python3 cli.py --save-local  # Saves as .md file locally
+python3 cli.py --source drive --save-local
+```
+- Analysis saved as `analysis_TopicName_YYYYMMDD_HHMMSS.md`
+- Stored in current directory
+
+**Configure Output Folder (.env):**
+```bash
+# Set default output folder for Google Docs
+OUTPUT_FOLDER_ID=1MVUaQyfyzaaBt-hOeUC9JFSiQeqE3no5
+```
+
 ### Interactive Menu Options
 
-Once the application starts, you'll see:
+Once the application starts (in either Gmail or Drive mode), you'll see:
 
-1. **List of available transcripts** - Shows all emails matching the subject pattern
+1. **List of available transcripts/documents** - Shows all content from your selected source
 2. **Analysis options:**
    - Enter a number (e.g., `1`) - Analyze a specific transcript
    - Enter `all` - Analyze all transcripts sequentially (with display and prompts)
@@ -293,11 +410,15 @@ Each analysis includes:
 
 ### Saved Files
 
-Analysis files are automatically named:
+**Google Docs (Default):**
+- Named by date: `MMDDYYYY` (e.g., `11062024`)
+- Saved to configured OUTPUT_FOLDER_ID
+- Returns URL for immediate viewing
+
+**Local Markdown (with --save-local):**
 ```
 analysis_[topic]_[timestamp].md
 ```
-
 Example: `analysis_AI_Strategy_Implementation_20251104_143022.md`
 
 ## Transcript Tab Detection
@@ -316,6 +437,7 @@ For best results with verbatim quotes, use recordings that have a full Transcrip
 article-idea-generator/
 ├── cli.py                     # Main interactive CLI application
 ├── gmail_client.py            # Gmail API integration with label filtering
+├── google_drive_client.py     # Google Drive API for folder scanning
 ├── google_docs_client.py      # Google Docs API for transcript extraction
 ├── content_analyzer.py        # Claude API integration for analysis
 ├── requirements.txt           # Python dependencies
@@ -376,14 +498,22 @@ pip install -r requirements.txt
 
 ## Tips for Best Results
 
-1. **Customize content focus for your domain** - Use `--focus` to tailor analysis to your specific industry or content area
-2. **Choose transcripts with full Transcript tabs** - These contain speaker names and verbatim dialogue
-3. **Use label filtering** - Tag important conversations in Gmail with labels like "Blog potential"
-4. **Review transcripts before analyzing** - The quality of analysis depends on transcript quality
-5. **Save important analyses** - Use the save feature to keep analyses you want to reference
-6. **Batch process related topics** - Use the `batch` option to analyze many conversations quickly
-7. **Combine options effectively** - Mix `--focus`, `--label`, and `--email` to target specific content areas
-8. **Refine topics** - The AI suggestions are starting points; use your editorial judgment
+1. **Choose the right source mode for your workflow:**
+   - **Gmail mode:** Best when transcripts arrive via email with consistent formatting
+   - **Drive mode:** Best when transcripts are stored in a dedicated folder or managed outside email
+2. **Customize content focus for your domain** - Use `--focus` to tailor analysis to your specific industry or content area
+3. **Gmail mode tips:**
+   - Choose transcripts with full Transcript tabs - These contain speaker names and verbatim dialogue
+   - Use label filtering - Tag important conversations in Gmail with labels like "Blog potential"
+4. **Drive mode tips:**
+   - Organize transcripts in dedicated folders for easy scanning
+   - Use DRIVE_RECURSIVE=true for nested folder structures
+   - Name documents descriptively - the document name becomes the "topic"
+5. **Review transcripts before analyzing** - The quality of analysis depends on transcript quality
+6. **Save important analyses** - Use the save feature to keep analyses you want to reference
+7. **Batch process related topics** - Use the `batch` option to analyze many conversations quickly
+8. **Combine options effectively** - Mix `--focus`, `--source`, and mode-specific flags
+9. **Refine topics** - The AI suggestions are starting points; use your editorial judgment
 
 ## Security Notes
 
