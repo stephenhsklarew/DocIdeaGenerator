@@ -5,18 +5,33 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class ContentAnalyzer:
-    def __init__(self, content_focus=None):
-        # Determine AI provider and model
-        self.provider = os.getenv('AI_PROVIDER', 'openai').lower()
+    def __init__(self, content_focus=None, mode='test'):
+        """
+        Initialize ContentAnalyzer with specified mode.
 
-        # Default models for each provider
-        default_models = {
-            'anthropic': 'claude-3-5-haiku-20241022',
-            'openai': 'gpt-4o-mini',
-            'google': 'gemini-1.5-flash'
-        }
+        Args:
+            content_focus: Custom content focus string
+            mode: 'test' (uses Gemini 1.5 Flash) or 'production' (uses GPT-4o). Default: 'test'
+        """
+        # Mode-based configuration
+        if mode == 'production':
+            self.provider = 'openai'
+            self.model = 'gpt-4o'
+        elif mode == 'test':
+            self.provider = 'google'
+            self.model = 'gemini-1.5-flash'
+        else:
+            # Fallback to environment variables if mode is invalid
+            self.provider = os.getenv('AI_PROVIDER', 'google').lower()
 
-        self.model = os.getenv('AI_MODEL', default_models.get(self.provider, 'gpt-4o-mini'))
+            # Default models for each provider
+            default_models = {
+                'anthropic': 'claude-3-5-haiku-20241022',
+                'openai': 'gpt-4o-mini',
+                'google': 'gemini-1.5-flash'
+            }
+
+            self.model = os.getenv('AI_MODEL', default_models.get(self.provider, 'gemini-1.5-flash'))
 
         # Initialize the appropriate client
         self._init_client()
