@@ -1,10 +1,15 @@
-# Qwilo - Article Idea Generator
+# DocIdeaGenerator
 
-An interactive CLI tool that fetches Gemini conversation transcripts from Gmail and analyzes them to generate article content suggestions. The content focus is fully configurable - by default it targets AI strategy and innovation for business leaders, but can be customized for any domain.
+An interactive CLI tool that fetches Gemini conversation transcripts from Gmail or a Google Drive folder and analyzes them to generate content suggestions. The content focus is fully configurable - by default it targets AI strategy and innovation for business leaders, but can be customized for any domain.
 
 ## Features
 
 - **Dual Source Modes** - Fetch content from Gmail emails OR scan Google Drive folders
+- **Flexible AI Model Selection:**
+  - **Test Mode (default):** Fast and economical with Gemini 1.5 Flash
+  - **Production Mode:** High quality with GPT-4o
+  - **Custom Models:** Override with any specific AI model (Claude, GPT, Gemini)
+  - Supports OpenAI, Anthropic, and Google providers
 - **Configurable Content Focus** - Customize the analysis angle for any domain (AI strategy, product management, marketing, DevOps, etc.)
 - **Gmail Mode:**
   - Fetches transcripts from Gmail with subject pattern: `Notes: "[Subject]" [MMM DD, YYYY]`
@@ -19,7 +24,7 @@ An interactive CLI tool that fetches Gemini conversation transcripts from Gmail 
   - **Optional:** Save as local markdown files with `--save-local` flag
   - Automatic folder organization in Google Drive
 - Interactive CLI with ASCII art logo and rich terminal UI
-- AI-powered content analysis using Claude API
+- AI-powered content analysis
 - Generates:
   - Recommended article topics (2-4 topics)
   - Key insights specific to each topic
@@ -97,20 +102,23 @@ pip install -r requirements.txt
 2. Edit `.env` and configure your AI provider:
    ```bash
    # ===== AI PROVIDER CONFIGURATION =====
-   # Choose: anthropic, openai, or google
-   # Default: openai (most cost-effective)
-   AI_PROVIDER=openai
+   # Note: The default mode is TEST (uses Gemini 1.5 Flash - FREE)
+   # You can override with --mode or --model command-line arguments
 
-   # Add your API key (only need one)
-   OPENAI_API_KEY=your_openai_api_key_here
+   # Choose: anthropic, openai, or google
+   AI_PROVIDER=google
+
+   # Add your API key (only need the one for your chosen provider)
+   GOOGLE_API_KEY=your_google_key_here
+   # OR
+   # OPENAI_API_KEY=your_openai_api_key_here
    # OR
    # ANTHROPIC_API_KEY=your_anthropic_key_here
-   # OR
-   # GOOGLE_API_KEY=your_google_key_here
 
-   # Optional: Override default model
+   # Optional: Override default model (usually not needed)
+   # Command-line --mode and --model arguments are recommended instead
    # Defaults: gpt-4o-mini (openai), claude-3-5-haiku (anthropic), gemini-1.5-flash (google)
-   # AI_MODEL=gpt-4o-mini
+   # AI_MODEL=gemini-1.5-flash
 
    # Optional: Content focus for article generation
    # Default: AI strategy and innovation for business leaders
@@ -139,14 +147,21 @@ pip install -r requirements.txt
 
 For a typical 12K-word transcript analysis:
 
-| Provider | Model | Cost per Analysis | Monthly Cost (100 analyses) | Notes |
-|----------|-------|-------------------|----------------------------|--------|
-| **OpenAI** (default) | gpt-4o-mini | ~$0.005 | ~$0.50 | Best value, excellent quality |
-| Google | gemini-1.5-flash | FREE | FREE | 1,500 requests/day free tier |
-| Anthropic | claude-3-5-haiku | ~$0.035 | ~$3.50 | Premium quality, good value |
-| Anthropic | claude-sonnet-4 | ~$0.91 | ~$91 | Highest quality, expensive |
+| Mode | Provider | Model | Cost per Analysis | Monthly Cost (100 analyses) | Notes |
+|------|----------|-------|-------------------|----------------------------|--------|
+| **Test (default)** | Google | gemini-1.5-flash | FREE | FREE | 1,500 requests/day free tier |
+| **Production** | OpenAI | gpt-4o | ~$0.10 | ~$10 | High quality, reasonable cost |
+| Custom | OpenAI | gpt-4o-mini | ~$0.005 | ~$0.50 | Best value, excellent quality |
+| Custom | OpenAI | gpt-4-turbo | ~$0.30 | ~$30 | Very high quality |
+| Custom | Anthropic | claude-3-5-haiku | ~$0.035 | ~$3.50 | Premium quality, good value |
+| Custom | Anthropic | claude-3-5-sonnet | ~$0.91 | ~$91 | Highest quality |
+| Custom | Google | gemini-1.5-pro | ~$0.15 | ~$15 | Good quality, decent cost |
 
-**Recommendation:** Use the default **OpenAI gpt-4o-mini** for the best balance of cost and quality. Or try **Google Gemini Flash** if you want completely free (within limits).
+**Recommendations:**
+- **For testing/development:** Use default **Test Mode** (Gemini 1.5 Flash) - completely free within generous limits
+- **For production:** Use **Production Mode** (GPT-4o) - excellent quality at reasonable cost
+- **For maximum value:** Use custom `--model gpt-4o-mini` - best cost/quality ratio
+- **For highest quality:** Use custom `--model claude-3-5-sonnet-20241022` - best analysis quality
 
 ### 5. First Run Authentication
 
@@ -190,12 +205,14 @@ Qwilo supports two source modes:
 
 **Gmail Mode (default):**
 ```bash
-python3 cli.py
+python3 cli.py                    # Uses test mode (Gemini 1.5 Flash)
+python3 cli.py --mode production  # Uses production mode (GPT-4o)
 ```
 
 **Drive Mode:**
 ```bash
-python3 cli.py --source drive
+python3 cli.py --source drive                    # Test mode
+python3 cli.py --source drive --mode production  # Production mode
 ```
 
 Or make it executable:
@@ -203,6 +220,43 @@ Or make it executable:
 chmod +x cli.py
 ./cli.py --source drive
 ```
+
+### AI Model Selection
+
+The tool supports three ways to select AI models:
+
+**1. Test Mode (default) - Fast & Economical:**
+```bash
+python3 cli.py                    # Uses Gemini 1.5 Flash
+python3 cli.py --mode test        # Explicit test mode
+```
+
+**2. Production Mode - High Quality:**
+```bash
+python3 cli.py --mode production  # Uses GPT-4o
+```
+
+**3. Custom Model - Override Any Model:**
+```bash
+# Auto-detect provider from model name
+python3 cli.py --model gpt-4o-mini
+python3 cli.py --model claude-3-5-sonnet-20241022
+python3 cli.py --model gemini-1.5-pro
+
+# Explicitly specify provider
+python3 cli.py --model claude-3-opus-20240229 --provider anthropic
+python3 cli.py --model gpt-4-turbo --provider openai
+
+# Works with all other options
+python3 cli.py --source drive --model claude-3-5-sonnet-20241022
+python3 cli.py --email "Meeting" --model gpt-4o --separate-files
+```
+
+**Available Models:**
+
+- **OpenAI:** gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-3.5-turbo, o1-preview, o1-mini
+- **Anthropic:** claude-3-5-sonnet-20241022, claude-3-5-haiku-20241022, claude-3-opus-20240229
+- **Google:** gemini-1.5-flash, gemini-1.5-pro, gemini-2.0-flash-exp
 
 ### Gmail Mode Command-Line Options
 
@@ -241,9 +295,10 @@ python3 cli.py --separate-files  # Save each analysis to separate file (default:
 
 Combine multiple options:
 ```bash
-python3 cli.py --label "blog-potential" --email "Strategy"
-python3 cli.py --focus "engineering leadership" --separate-files
+python3 cli.py --label "blog-potential" --email "Strategy" --mode production
+python3 cli.py --focus "engineering leadership" --separate-files --model gpt-4o-mini
 python3 cli.py --email "Product" --focus "product management" --label "priority"
+python3 cli.py --model claude-3-5-sonnet-20241022 --email "Meeting" --separate-files
 ```
 
 ### Drive Mode Command-Line Options
@@ -258,14 +313,18 @@ python3 cli.py --source drive --folder-id 1a2b3c4d5e6f7g8h9i0j
 2. Copy the ID from the URL: `https://drive.google.com/drive/folders/FOLDER_ID`
 3. The FOLDER_ID is the long string after `/folders/`
 
-Combine with content focus:
+Combine with content focus and AI models:
 ```bash
 python3 cli.py --source drive --focus "product management best practices"
+python3 cli.py --source drive --mode production
+python3 cli.py --source drive --model claude-3-5-sonnet-20241022
+python3 cli.py --source drive --model gpt-4o-mini --focus "DevOps practices"
 ```
 
 Save to separate files:
 ```bash
 python3 cli.py --source drive --separate-files
+python3 cli.py --source drive --separate-files --model gpt-4o
 ```
 
 **Configuration via .env:**
