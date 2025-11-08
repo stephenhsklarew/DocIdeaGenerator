@@ -26,9 +26,12 @@ An interactive CLI tool that fetches Gemini conversation transcripts from Gmail 
 - Interactive CLI with ASCII art logo and rich terminal UI
 - AI-powered content analysis
 - Generates:
-  - Recommended article topics (2-4 topics)
-  - Key insights specific to each topic
-  - Notable verbatim quotes with speaker attribution
+  - Recommended article topics (2-5 topics per analysis)
+  - Compelling topic titles geared to target audience
+  - 2-5 key insights specific to each topic
+  - 1-3 notable verbatim quotes with speaker attribution
+  - Optional evidence/data and statistics when mentioned
+  - Optional real-world examples and case studies when shared
 - Batch processing support with combined or separate file output
 
 ## Prerequisites
@@ -442,30 +445,50 @@ The date format is `MMDDYYYY`:
 
 ### Output Format
 
-Each analysis includes:
+Each analysis includes **2-5 topics**, with each topic containing:
 
 ```markdown
 **Source:** [Original email subject]
 
 ## TOPIC 1: [Topic Title]
 
-**Description:** [1-2 sentences on why this would make a good article]
+**Description:** [1-3 sentences on why this would make a good article for the target audience]
 
 **Key Insights:**
 • [Insight 1 related to this topic]
 • [Insight 2 related to this topic]
 • [Insight 3 related to this topic]
+• [Insight 4 related to this topic]
+• [Insight 5 related to this topic]
 
 **Notable Quotes:**
 > **[Speaker Name]:** "[Exact verbatim quote from transcript]"
 
 > **[Speaker Name]:** "[Another exact quote]"
 
+> **[Speaker Name]:** "[Third exact quote]"
+
+**Evidence/Data:** (Optional - when relevant data is mentioned)
+• [Specific statistic, data point, or research finding]
+• [Another piece of supporting evidence]
+
+**Real-World Examples:** (Optional - when stories or examples are shared)
+• [Real-world story, case study, or example from the conversation]
+• [Another relevant example or perspective]
+
 ---
 
 ## TOPIC 2: [Topic Title]
 ...
 ```
+
+**What's included in each topic:**
+- **Compelling topic title** geared towards the target audience
+- **1-3 sentence description** explaining why this would make a good article
+- **2-5 key insights** specifically related to that topic
+- **1-3 notable quotes** with speaker attribution (verbatim from transcript)
+- **Evidence/Data** (optional) - statistics, research, or data points mentioned
+- **Real-World Examples** (optional) - stories, case studies, or perspectives shared
 
 ### Saved Files
 

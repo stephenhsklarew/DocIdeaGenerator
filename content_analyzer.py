@@ -128,23 +128,54 @@ Date: {transcript['date']}
 Transcript:
 {transcript['body']}
 
-Please analyze this transcript and provide 2-4 recommended topics. For EACH topic, include:
-- A compelling topic title
-- 1-2 sentence description of why this would make a good article
-- 2-3 KEY INSIGHTS specifically related to this topic
-- 1-2 NOTABLE QUOTES that support this topic (with speaker name if identifiable)
+Please analyze this transcript and provide 2-5 recommended topics. For EACH topic, include:
+- A compelling topic title geared towards the audience
+- 1-3 sentence description of why this would make a good article
+- 2-5 KEY INSIGHTS specifically related to this topic
+- 1-3 NOTABLE QUOTES that support this topic (with speaker name if identifiable)
+- OPTIONAL: Evidence or supporting data that provides credible facts
+- OPTIONAL: Real-world stories or perspectives mentioned in the conversation
 
 IMPORTANT INSTRUCTIONS:
 - Extract ACTUAL verbatim quotes from the transcript text
 - Include the speaker's name next to each quote in the format: **[Name]:**
 - Make insights actionable and specific
 - Focus on content relevant to {self.content_focus}
+- Include evidence/data and real-world stories when they appear in the transcript
 
 Format your response EXACTLY as follows:
 
 ## TOPIC 1: [Topic Title]
 
-**Description:** [1-2 sentence description of why this would make a good article]
+**Description:** [1-3 sentence description of why this would make a good article for the target audience]
+
+**Key Insights:**
+• [Insight 1 related to this topic]
+• [Insight 2 related to this topic]
+• [Insight 3 related to this topic]
+• [Insight 4 related to this topic]
+• [Insight 5 related to this topic]
+
+**Notable Quotes:**
+> **[Speaker Name]:** "[Exact quote extracted verbatim from the transcript]"
+
+> **[Speaker Name]:** "[Exact quote extracted verbatim from the transcript]"
+
+> **[Speaker Name]:** "[Exact quote extracted verbatim from the transcript]"
+
+**Evidence/Data:** (Optional - include if relevant data or statistics are mentioned)
+• [Specific data point, statistic, or research finding mentioned in the conversation]
+• [Another piece of supporting evidence]
+
+**Real-World Examples:** (Optional - include if stories or examples are shared)
+• [Real-world story, case study, or example from the conversation]
+• [Another relevant example or perspective]
+
+---
+
+## TOPIC 2: [Topic Title]
+
+**Description:** [1-3 sentence description]
 
 **Key Insights:**
 • [Insight 1 related to this topic]
@@ -154,24 +185,20 @@ Format your response EXACTLY as follows:
 **Notable Quotes:**
 > **[Speaker Name]:** "[Exact quote extracted verbatim from the transcript]"
 
-> **[Speaker Name]:** "[Exact quote extracted verbatim from the transcript]"
+**Evidence/Data:** (Optional)
+• [Relevant data if mentioned]
+
+**Real-World Examples:** (Optional)
+• [Relevant example if mentioned]
 
 ---
 
-## TOPIC 2: [Topic Title]
+Continue this format for all topics (2-5 total).
 
-**Description:** [1-2 sentence description]
-
-**Key Insights:**
-• [Insight 1 related to this topic]
-• [Insight 2 related to this topic]
-
-**Notable Quotes:**
-> **[Speaker Name]:** "[Exact quote extracted verbatim from the transcript]"
-
----
-
-Continue this format for all topics (2-4 total)."""
+NOTES:
+- Only include Evidence/Data and Real-World Examples sections when relevant information exists in the transcript
+- Include 2-5 insights per topic (use as many as are substantive and relevant)
+- Include 1-3 quotes per topic (more quotes when they strongly support the topic)"""
 
     def _call_anthropic(self, prompt: str) -> str:
         """Call Anthropic API"""
