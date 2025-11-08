@@ -6,6 +6,8 @@ Usage:
   # Gmail mode (default)
   python cli.py                           # Interactive mode (test mode with Gemini 1.5 Flash)
   python cli.py --mode production         # Use production mode (GPT-4o)
+  python cli.py --model gpt-4o-mini       # Use specific AI model (auto-detects provider)
+  python cli.py --model claude-3-5-sonnet-20241022 --provider anthropic  # Specify model and provider
   python cli.py --separate-files          # Save each analysis to separate files
   python cli.py --focus "custom topic"    # Override content focus
   python cli.py --email "Notes: Meeting"  # Analyze specific email by subject
@@ -16,6 +18,7 @@ Usage:
   python cli.py --source drive --folder-id ABC123  # Use specific folder
   python cli.py --source drive --separate-files    # Drive mode with separate output files
   python cli.py --source drive --mode production   # Drive mode with production AI model
+  python cli.py --source drive --model gemini-1.5-pro  # Drive mode with custom model
 """
 import sys
 import os
@@ -234,7 +237,7 @@ def get_start_date() -> str:
 
     return start_date
 
-def main_menu_drive(folder_id=None, name_pattern=None, modified_after=None, separate_files=False, content_focus=None, save_local=False, mode='test'):
+def main_menu_drive(folder_id=None, name_pattern=None, modified_after=None, separate_files=False, content_focus=None, save_local=False, mode='test', model_override=None, provider_override=None):
     """Display the main menu and handle user interaction for Drive mode"""
     display_banner()
 
@@ -250,7 +253,12 @@ def main_menu_drive(folder_id=None, name_pattern=None, modified_after=None, sepa
             console.print(f"[cyan]Recursive scan: Enabled[/cyan]")
 
         # Display mode
-        mode_display = "Test Mode (Gemini 1.5 Flash)" if mode == 'test' else "Production Mode (GPT-4o)"
+        if model_override:
+            mode_display = f"Custom Model: {model_override}"
+            if provider_override:
+                mode_display += f" (Provider: {provider_override})"
+        else:
+            mode_display = "Test Mode (Gemini 1.5 Flash)" if mode == 'test' else "Production Mode (GPT-4o)"
         console.print(f"[cyan]AI Mode: {mode_display}[/cyan]\n")
 
         console.print("[bold]Fetching documents...[/bold]")
@@ -291,7 +299,7 @@ def main_menu_drive(folder_id=None, name_pattern=None, modified_after=None, sepa
 
         console.print(f"[green]✓ Loaded {len(transcripts)} documents[/green]\n")
 
-        analyzer = ContentAnalyzer(content_focus=content_focus, mode=mode)
+        analyzer = ContentAnalyzer(content_focus=content_focus, mode=mode, model_override=model_override, provider_override=provider_override)
 
         while True:
             display_transcripts(transcripts)
@@ -409,7 +417,7 @@ def main_menu_drive(folder_id=None, name_pattern=None, modified_after=None, sepa
         import traceback
         console.print(traceback.format_exc())
 
-def main_menu(label=None, separate_files=False, content_focus=None, save_local=False, mode='test'):
+def main_menu(label=None, separate_files=False, content_focus=None, save_local=False, mode='test', model_override=None, provider_override=None):
     """Display the main menu and handle user interaction"""
     display_banner()
 
@@ -429,7 +437,12 @@ def main_menu(label=None, separate_files=False, content_focus=None, save_local=F
             console.print(f"[cyan]Filtering transcripts from {dt.strftime('%B %d, %Y')} onwards...[/cyan]")
 
         # Display mode
-        mode_display = "Test Mode (Gemini 1.5 Flash)" if mode == 'test' else "Production Mode (GPT-4o)"
+        if model_override:
+            mode_display = f"Custom Model: {model_override}"
+            if provider_override:
+                mode_display += f" (Provider: {provider_override})"
+        else:
+            mode_display = "Test Mode (Gemini 1.5 Flash)" if mode == 'test' else "Production Mode (GPT-4o)"
         console.print(f"[cyan]AI Mode: {mode_display}[/cyan]\n")
 
         console.print("[bold]Fetching transcripts...[/bold]")
@@ -439,7 +452,7 @@ def main_menu(label=None, separate_files=False, content_focus=None, save_local=F
             console.print("[yellow]No transcripts found. Exiting.[/yellow]")
             return
 
-        analyzer = ContentAnalyzer(content_focus=content_focus, mode=mode)
+        analyzer = ContentAnalyzer(content_focus=content_focus, mode=mode, model_override=model_override, provider_override=provider_override)
 
         while True:
             display_transcripts(transcripts)
@@ -576,7 +589,7 @@ def list_emails_only(start_date=None, label=None):
     display_transcripts(transcripts)
 
 
-def analyze_specific_email(email_subject, start_date=None, label=None, separate_files=False, content_focus=None, save_local=False, mode='test'):
+def analyze_specific_email(email_subject, start_date=None, label=None, separate_files=False, content_focus=None, save_local=False, mode='test', model_override=None, provider_override=None):
     """Analyze a specific email by subject line (supports partial matching)"""
     console.print("[bold]Connecting to Gmail...[/bold]")
     gmail = GmailClient(start_date=start_date, label=label)
@@ -587,7 +600,12 @@ def analyze_specific_email(email_subject, start_date=None, label=None, separate_
         console.print(f"[cyan]Filtering by label: {label}[/cyan]")
 
     # Display mode
-    mode_display = "Test Mode (Gemini 1.5 Flash)" if mode == 'test' else "Production Mode (GPT-4o)"
+    if model_override:
+        mode_display = f"Custom Model: {model_override}"
+        if provider_override:
+            mode_display += f" (Provider: {provider_override})"
+    else:
+        mode_display = "Test Mode (Gemini 1.5 Flash)" if mode == 'test' else "Production Mode (GPT-4o)"
     console.print(f"[cyan]AI Mode: {mode_display}[/cyan]\n")
 
     console.print("[bold]Fetching transcripts...[/bold]")
@@ -616,7 +634,7 @@ def analyze_specific_email(email_subject, start_date=None, label=None, separate_
         if choice.lower() == 'all':
             console.print(f"\n[bold]Analyzing all {len(matches)} matching transcripts...[/bold]\n")
 
-            analyzer = ContentAnalyzer(content_focus=content_focus, mode=mode)
+            analyzer = ContentAnalyzer(content_focus=content_focus, mode=mode, model_override=model_override, provider_override=provider_override)
 
             results = []
             for idx, transcript in enumerate(matches, 1):
@@ -655,7 +673,7 @@ def analyze_specific_email(email_subject, start_date=None, label=None, separate_
     # Analyze the selected transcript
     console.print(f"\n[bold cyan]Analyzing: {transcript['topic']}[/bold cyan]\n")
 
-    analyzer = ContentAnalyzer(content_focus=content_focus, mode=mode)
+    analyzer = ContentAnalyzer(content_focus=content_focus, mode=mode, model_override=model_override, provider_override=provider_override)
     result = analyzer.analyze_transcript(transcript)
     display_analysis(result)
 
@@ -671,6 +689,9 @@ if __name__ == "__main__":
 Examples:
   python cli.py                           # Interactive mode (test mode, Gemini 1.5 Flash)
   python cli.py --mode production         # Interactive mode (production mode, GPT-4o)
+  python cli.py --model gpt-4o-mini       # Use specific model (auto-detects OpenAI)
+  python cli.py --model claude-3-5-sonnet-20241022  # Use Claude Sonnet (auto-detects Anthropic)
+  python cli.py --model gemini-1.5-pro --provider google  # Specify model and provider explicitly
   python cli.py --separate-files          # Interactive mode with separate files
   python cli.py --focus "product management for SaaS"  # Custom content focus
   python cli.py --email "Notes: Meeting"  # Analyze specific email by subject
@@ -681,6 +702,7 @@ Examples:
   python cli.py --email "Meeting" --label "Priority"  # Analyze with label filter
   python cli.py --focus "DevOps best practices" --separate-files  # Combine flags
   python cli.py --source drive --mode production  # Drive mode with GPT-4o
+  python cli.py --source drive --model claude-3-opus-20240229  # Drive mode with custom model
         """
     )
     parser.add_argument(
@@ -730,6 +752,15 @@ Examples:
         default='test',
         help='AI mode: test (uses Gemini 1.5 Flash) or production (uses GPT-4o). Default: test'
     )
+    parser.add_argument(
+        '--model',
+        help='Override AI model (e.g., gpt-4o, claude-3-5-sonnet-20241022, gemini-1.5-pro). Overrides --mode setting.'
+    )
+    parser.add_argument(
+        '--provider',
+        choices=['anthropic', 'openai', 'google'],
+        help='AI provider to use with --model (anthropic, openai, or google). Auto-detected if not specified.'
+    )
 
     args = parser.parse_args()
 
@@ -745,6 +776,8 @@ Examples:
         folder_id = args.folder_id  # For Drive mode
         save_local = args.save_local  # Save as markdown instead of Google Doc
         mode = args.mode  # AI mode: test or production
+        model_override = args.model  # Specific model override
+        provider_override = args.provider  # Specific provider override
 
         # Route to appropriate mode
         if source_mode == 'drive':
@@ -759,7 +792,9 @@ Examples:
                 separate_files=separate_files,
                 content_focus=content_focus,
                 save_local=save_local,
-                mode=mode
+                mode=mode,
+                model_override=model_override,
+                provider_override=provider_override
             )
 
         else:
@@ -775,11 +810,11 @@ Examples:
             elif args.email:
                 # Direct email analysis mode
                 display_banner()
-                analyze_specific_email(args.email, start_date, label, separate_files, content_focus, save_local, mode)
+                analyze_specific_email(args.email, start_date, label, separate_files, content_focus, save_local, mode, model_override, provider_override)
 
             else:
                 # Interactive mode (default)
-                main_menu(label=label, separate_files=separate_files, content_focus=content_focus, save_local=save_local, mode=mode)
+                main_menu(label=label, separate_files=separate_files, content_focus=content_focus, save_local=save_local, mode=mode, model_override=model_override, provider_override=provider_override)
 
     except KeyboardInterrupt:
         console.print("\n\n[bold blue]Thanks for using Qwilo. If you have improvement ideas, please email them to stephen@synaptiq.ai :)[/bold blue]\n")

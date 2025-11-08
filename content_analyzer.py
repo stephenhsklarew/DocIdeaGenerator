@@ -5,16 +5,37 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class ContentAnalyzer:
-    def __init__(self, content_focus=None, mode='test'):
+    def __init__(self, content_focus=None, mode='test', model_override=None, provider_override=None):
         """
         Initialize ContentAnalyzer with specified mode.
 
         Args:
             content_focus: Custom content focus string
             mode: 'test' (uses Gemini 1.5 Flash) or 'production' (uses GPT-4o). Default: 'test'
+            model_override: Specific model name to override mode defaults
+            provider_override: Specific provider to use with model_override ('anthropic', 'openai', or 'google')
         """
-        # Mode-based configuration
-        if mode == 'production':
+        # If model override is specified, use it with the provider
+        if model_override:
+            self.model = model_override
+
+            # If provider is explicitly specified, use it
+            if provider_override:
+                self.provider = provider_override.lower()
+            else:
+                # Auto-detect provider from model name
+                if 'claude' in model_override.lower():
+                    self.provider = 'anthropic'
+                elif 'gpt' in model_override.lower() or 'o1' in model_override.lower():
+                    self.provider = 'openai'
+                elif 'gemini' in model_override.lower():
+                    self.provider = 'google'
+                else:
+                    # Default to environment variable
+                    self.provider = os.getenv('AI_PROVIDER', 'google').lower()
+
+        # Mode-based configuration (only if no model override)
+        elif mode == 'production':
             self.provider = 'openai'
             self.model = 'gpt-4o'
         elif mode == 'test':
