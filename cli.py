@@ -692,7 +692,7 @@ def list_emails_only(start_date=None, label=None):
     display_transcripts(transcripts)
 
 
-def analyze_specific_email(email_subject, start_date=None, label=None, separate_files=False, combined_topics=False, content_focus=None, save_local=False, mode='test', model_override=None, provider_override=None):
+def analyze_specific_email(email_subject, start_date=None, label=None, separate_files=False, combined_topics=False, content_focus=None, save_local=False, mode='test', model_override=None, provider_override=None, auto_confirm=False):
     """Analyze a specific email by subject line (supports partial matching)"""
     console.print("[bold]Connecting to Gmail...[/bold]")
     gmail = GmailClient(start_date=start_date, label=label)
@@ -780,7 +780,8 @@ def analyze_specific_email(email_subject, start_date=None, label=None, separate_
     result = analyzer.analyze_transcript(transcript)
     display_analysis(result)
 
-    if Confirm.ask("Save this analysis?", default=True):
+    # Auto-confirm in non-interactive mode, otherwise prompt
+    if auto_confirm or Confirm.ask("Save this analysis?", default=True):
         save_analysis(result, save_local=save_local, combined_topics=combined_topics)
 
 
@@ -842,6 +843,11 @@ Examples:
         help='Save analysis as local markdown file instead of Google Doc (default: Google Doc)'
     )
     parser.add_argument(
+        '--yes', '-y',
+        action='store_true',
+        help='Auto-confirm all prompts (non-interactive mode for automation)'
+    )
+    parser.add_argument(
         '--focus',
         help='Content focus for article generation (default: AI strategy and innovation for business leaders)'
     )
@@ -885,6 +891,7 @@ Examples:
         content_focus = args.focus
         folder_id = args.folder_id  # For Drive mode
         save_local = args.save_local  # Save as markdown instead of Google Doc
+        auto_confirm = args.yes  # Auto-confirm all prompts (non-interactive mode)
         mode = args.mode  # AI mode: test or production
         model_override = args.model  # Specific model override
         provider_override = args.provider  # Specific provider override
@@ -921,7 +928,7 @@ Examples:
             elif args.email:
                 # Direct email analysis mode
                 display_banner()
-                analyze_specific_email(args.email, start_date, label, separate_files, combined_topics, content_focus, save_local, mode, model_override, provider_override)
+                analyze_specific_email(args.email, start_date, label, separate_files, combined_topics, content_focus, save_local, mode, model_override, provider_override, auto_confirm)
 
             else:
                 # Interactive mode (default)
