@@ -20,7 +20,8 @@ An interactive CLI tool that fetches Gemini conversation transcripts from Gmail 
   - Recursive subfolder scanning (optional)
   - Date filtering and name pattern matching
 - **Smart Output:**
-  - **Default:** Saves analysis as Google Docs in configured folder (named MMDDYYYY)
+  - **Default:** Saves each topic as a separate Google Doc (named MMDDYYYY_Topic_N_Title)
+  - **Optional:** Save all topics combined in one file with `--combined-topics` flag
   - **Optional:** Save as local markdown files with `--save-local` flag
   - Automatic folder organization in Google Drive
 - Interactive CLI with ASCII art logo and rich terminal UI
@@ -32,7 +33,7 @@ An interactive CLI tool that fetches Gemini conversation transcripts from Gmail 
   - 1-3 notable verbatim quotes with speaker attribution
   - Optional evidence/data (up to 5 items, 3-5 sentences each)
   - Optional real-world examples (up to 5 items, 3-5 sentences each)
-- Batch processing support with combined or separate file output
+- Batch processing support with per-topic file output (default) or combined file option
 
 ## Prerequisites
 
@@ -293,15 +294,15 @@ python3 cli.py --start-date 10232025
 
 Output options:
 ```bash
-python3 cli.py --separate-files  # Save each analysis to separate file (default: combined)
+python3 cli.py --combined-topics  # Save all topics in one file (default: separate topic files)
 ```
 
 Combine multiple options:
 ```bash
 python3 cli.py --label "blog-potential" --email "Strategy" --mode production
-python3 cli.py --focus "engineering leadership" --separate-files --model gpt-4o-mini
+python3 cli.py --focus "engineering leadership" --combined-topics --model gpt-4o-mini
 python3 cli.py --email "Product" --focus "product management" --label "priority"
-python3 cli.py --model claude-3-5-sonnet-20241022 --email "Meeting" --separate-files
+python3 cli.py --model claude-3-5-sonnet-20241022 --email "Meeting"
 ```
 
 ### Drive Mode Command-Line Options
@@ -324,10 +325,10 @@ python3 cli.py --source drive --model claude-3-5-sonnet-20241022
 python3 cli.py --source drive --model gpt-4o-mini --focus "DevOps practices"
 ```
 
-Save to separate files:
+Save to combined file:
 ```bash
-python3 cli.py --source drive --separate-files
-python3 cli.py --source drive --separate-files --model gpt-4o
+python3 cli.py --source drive --combined-topics
+python3 cli.py --source drive --combined-topics --model gpt-4o
 ```
 
 **Configuration via .env:**
@@ -492,7 +493,14 @@ Each analysis includes **2-5 topics**, with each topic containing:
 
 ### Saved Files
 
-**Google Docs (Default):**
+**Google Docs (Default - Per-Topic Files):**
+- Each topic saved as separate file
+- Named: `MMDDYYYY_Topic_N_TopicTitle` (e.g., `11082025_Topic_1_AI_Strategy_Evolution`)
+- Saved to configured OUTPUT_FOLDER_ID
+- Returns URL for each document created
+
+**Google Docs (with --combined-topics):**
+- All topics in one file
 - Named by date: `MMDDYYYY` (e.g., `11062024`)
 - Saved to configured OUTPUT_FOLDER_ID
 - Returns URL for immediate viewing
