@@ -520,6 +520,60 @@ def main_menu_drive(folder_id=None, name_pattern=None, modified_after=None, sepa
         import traceback
         console.print(traceback.format_exc())
 
+def batch_process_all(start_date=None, label=None, separate_files=False, combined_topics=False, content_focus=None, save_local=False, mode='test', model_override=None, provider_override=None):
+    """Batch process all emails matching criteria (non-interactive mode)"""
+    display_banner()
+
+    try:
+        console.print("[bold]Connecting to Gmail...[/bold]")
+        gmail = GmailClient(start_date=start_date, label=label)
+        docs_client = GoogleDocsClient()
+        console.print("[green]✓ Connected successfully![/green]\n")
+
+        if label:
+            console.print(f"[cyan]Filtering by label: {label}[/cyan]")
+        if start_date:
+            dt = datetime.strptime(start_date, '%m%d%Y')
+            console.print(f"[cyan]Filtering transcripts from {dt.strftime('%B %d, %Y')} onwards...[/cyan]")
+
+        # Display mode
+        if model_override:
+            mode_display = f"Custom Model: {model_override}"
+            if provider_override:
+                mode_display += f" (Provider: {provider_override})"
+        else:
+            mode_display = "Test Mode (Gemini 1.5 Flash)" if mode == 'test' else "Production Mode (GPT-4o)"
+        console.print(f"[cyan]AI Mode: {mode_display}[/cyan]\n")
+
+        console.print("[bold]Fetching transcripts...[/bold]")
+        transcripts = gmail.get_transcripts()
+
+        if not transcripts:
+            console.print("[yellow]No transcripts found.[/yellow]")
+            return
+
+        console.print(f"[bold cyan]Batch Mode:[/bold cyan] Processing {len(transcripts)} transcripts...\n")
+
+        analyzer = ContentAnalyzer(content_focus=content_focus, mode=mode, model_override=model_override, provider_override=provider_override)
+        results = []
+
+        for idx, transcript in enumerate(transcripts, 1):
+            console.print(f"[cyan]Analyzing {idx}/{len(transcripts)}: {transcript['topic']}[/cyan]")
+            result = analyzer.analyze_transcript(transcript)
+            results.append(result)
+
+        # Auto-save results
+        if results:
+            console.print("\n[cyan]Saving results...[/cyan]")
+            for result in results:
+                save_analysis(result, save_local=save_local, docs_client=docs_client, combined_topics=combined_topics)
+            console.print(f"\n[green]✓ Successfully processed and saved {len(results)} transcripts![/green]")
+
+    except Exception as e:
+        console.print(f"[red]Error during batch processing: {str(e)}[/red]")
+        import traceback
+        console.print(traceback.format_exc())
+
 def main_menu(label=None, separate_files=False, combined_topics=False, content_focus=None, save_local=False, mode='test', model_override=None, provider_override=None):
     """Display the main menu and handle user interaction"""
     display_banner()
@@ -848,6 +902,11 @@ Examples:
         help='Auto-confirm all prompts (non-interactive mode for automation)'
     )
     parser.add_argument(
+        '--batch', '-b',
+        action='store_true',
+        help='Batch mode: process all emails matching criteria and auto-save (non-interactive)'
+    )
+    parser.add_argument(
         '--focus',
         help='Content focus for article generation (default: AI strategy and innovation for business leaders)'
     )
@@ -929,6 +988,10 @@ Examples:
                 # Direct email analysis mode
                 display_banner()
                 analyze_specific_email(args.email, start_date, label, separate_files, combined_topics, content_focus, save_local, mode, model_override, provider_override, auto_confirm)
+
+            elif args.batch:
+                # Batch mode - process all emails matching criteria
+                batch_process_all(start_date=start_date, label=label, separate_files=separate_files, combined_topics=combined_topics, content_focus=content_focus, save_local=save_local, mode=mode, model_override=model_override, provider_override=provider_override)
 
             else:
                 # Interactive mode (default)
