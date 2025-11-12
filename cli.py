@@ -92,7 +92,7 @@ def display_banner():
 ║       ████       ╚██████╔╝╚███╔███╔╝██║███████╗╚██████╔╝   ║
 ║                   ╚══▀▀═╝  ╚══╝╚══╝ ╚═╝╚══════╝ ╚═════╝    ║
 ║                                                            ║
-║             The Article Idea Generator                     ║
+║   The Worlds Greatest Personalized AI Content Generator   ║
 ║                                                            ║
 ╚════════════════════════════════════════════════════════════╝
 """
@@ -946,6 +946,11 @@ Examples:
         action='store_true',
         help='Use fast mode with Gemini 2.5 Flash for interactive sessions (300+ tok/s). Default uses Qwen 2.5 32B (free, local, ~11 tok/s).'
     )
+    parser.add_argument(
+        '--select-all',
+        action='store_true',
+        help='Auto-select all transcripts without prompting (for automated/scheduled runs). Implies --batch mode.'
+    )
 
     args = parser.parse_args()
 
@@ -970,6 +975,11 @@ Examples:
         if args.fast and not model_override:
             model_override = 'gemini-2.5-flash'
             provider_override = 'google'
+
+        # Handle --select-all flag - force batch mode for automated runs
+        if args.select_all:
+            args.batch = True
+            auto_confirm = True  # Also auto-confirm to avoid any prompts
 
         # Route to appropriate mode
         if source_mode == 'drive':
