@@ -92,7 +92,7 @@ def display_banner():
 ║       ████       ╚██████╔╝╚███╔███╔╝██║███████╗╚██████╔╝   ║
 ║                   ╚══▀▀═╝  ╚══╝╚══╝ ╚═╝╚══════╝ ╚═════╝    ║
 ║                                                            ║
-║   The Worlds Greatest Personalized AI Content Generator   ║
+║   The World's Greatest Personalized AI Content Generator  ║
 ║                                                            ║
 ╚════════════════════════════════════════════════════════════╝
 """
