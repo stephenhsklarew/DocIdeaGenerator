@@ -343,6 +343,88 @@ def get_start_date() -> str:
 
     return start_date
 
+def batch_process_drive(folder_id=None, name_pattern=None, modified_after=None, separate_files=False, combined_topics=False, content_focus=None, save_local=False, mode='test', model_override=None, provider_override=None):
+    """Batch process all Google Drive documents (non-interactive mode)"""
+    display_banner()
+
+    try:
+        console.print("[bold]Connecting to Google Drive...[/bold]")
+        drive_client = GoogleDriveClient(folder_id=folder_id)
+        docs_client = GoogleDocsClient()
+        console.print("[green]✓ Connected successfully![/green]\n")
+
+        if drive_client.folder_id:
+            console.print(f"[cyan]Scanning folder: {drive_client.folder_id}[/cyan]")
+
+        # Display mode
+        if model_override:
+            mode_display = f"Custom Model: {model_override}"
+            if provider_override:
+                mode_display += f" (Provider: {provider_override})"
+        else:
+            mode_display = "Test Mode (Qwen 2.5 32B)" if mode == 'test' else "Production Mode (Qwen 2.5 32B)"
+        console.print(f"[cyan]AI Mode: {mode_display}[/cyan]\n")
+
+        console.print("[bold]Fetching documents...[/bold]")
+        documents = drive_client.list_documents(
+            name_pattern=name_pattern,
+            modified_after=modified_after
+        )
+
+        if not documents:
+            console.print("[yellow]No documents found.[/yellow]")
+            return
+
+        # Convert Drive documents to transcript format for compatibility
+        transcripts = []
+        console.print(f"[bold]Loading content from {len(documents)} documents...[/bold]")
+
+        for doc in documents:
+            console.print(f"  → Loading: {doc['name']}")
+            content = docs_client.get_plain_document_content(doc['id'])
+
+            if content:
+                # Parse date from modified time
+                try:
+                    dt = datetime.fromisoformat(doc['modified'].replace('Z', '+00:00'))
+                    date_str = dt.strftime('%b %d, %Y')
+                except:
+                    date_str = doc.get('modified', 'Unknown date')
+
+                transcripts.append({
+                    'id': doc['id'],
+                    'subject': doc['name'],
+                    'topic': doc['name'],
+                    'date': date_str,
+                    'body': content,
+                    'source': 'drive',
+                    'folder_path': doc.get('folder_path', '')
+                })
+
+        console.print(f"[green]✓ Loaded {len(transcripts)} documents[/green]\n")
+
+        console.print(f"[bold cyan]Batch Mode:[/bold cyan] Processing {len(transcripts)} documents...\n")
+
+        analyzer = ContentAnalyzer(content_focus=content_focus, mode=mode, model_override=model_override, provider_override=provider_override)
+        results = []
+
+        for idx, transcript in enumerate(transcripts, 1):
+            console.print(f"[cyan]Analyzing {idx}/{len(transcripts)}: {transcript['topic']}[/cyan]")
+            result = analyzer.analyze_transcript(transcript)
+            results.append(result)
+
+        # Auto-save results
+        if results:
+            console.print("\n[cyan]Saving results...[/cyan]")
+            for result in results:
+                save_analysis(result, save_local=save_local, docs_client=docs_client, combined_topics=combined_topics)
+            console.print(f"\n[green]✓ Successfully processed and saved {len(results)} documents![/green]")
+
+    except Exception as e:
+        console.print(f"[red]Error during batch processing: {str(e)}[/red]")
+        import traceback
+        console.print(traceback.format_exc())
+
 def main_menu_drive(folder_id=None, name_pattern=None, modified_after=None, separate_files=False, combined_topics=False, content_focus=None, save_local=False, mode='test', model_override=None, provider_override=None):
     """Display the main menu and handle user interaction for Drive mode"""
     display_banner()
@@ -987,18 +1069,33 @@ Examples:
             if args.list or args.email or label:
                 console.print("[yellow]Warning: --list, --email, and --label flags are only for Gmail mode and will be ignored in Drive mode[/yellow]\n")
 
-            # Interactive Drive mode
-            main_menu_drive(
-                folder_id=folder_id,
-                modified_after=start_date,
-                separate_files=separate_files,
-                combined_topics=combined_topics,
-                content_focus=content_focus,
-                save_local=save_local,
-                mode=mode,
-                model_override=model_override,
-                provider_override=provider_override
-            )
+            # Drive mode routing
+            if args.batch:
+                # Batch mode - process all Drive documents matching criteria
+                batch_process_drive(
+                    folder_id=folder_id,
+                    modified_after=start_date,
+                    separate_files=separate_files,
+                    combined_topics=combined_topics,
+                    content_focus=content_focus,
+                    save_local=save_local,
+                    mode=mode,
+                    model_override=model_override,
+                    provider_override=provider_override
+                )
+            else:
+                # Interactive Drive mode
+                main_menu_drive(
+                    folder_id=folder_id,
+                    modified_after=start_date,
+                    separate_files=separate_files,
+                    combined_topics=combined_topics,
+                    content_focus=content_focus,
+                    save_local=save_local,
+                    mode=mode,
+                    model_override=model_override,
+                    provider_override=provider_override
+                )
 
         else:
             # Gmail mode (default)
